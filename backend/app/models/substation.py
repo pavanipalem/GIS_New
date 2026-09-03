@@ -126,7 +126,11 @@ class Transformer(Base):
     make: Mapped[str | None] = mapped_column(String(150))
     vector_group: Mapped[str | None] = mapped_column(String(50))
     year_of_commissioning: Mapped[date | None] = mapped_column(Date)
-    # legacy ptrN_yoc is frequently free text ("not commissioned", "28.12.2018", "")
+    # Legacy ptrN_yoc arrives in ~8 formats, including year-only ("2024")
+    # and free text ("not commissioned"). A full date fills both columns;
+    # a year-only value fills yoc_year alone; anything unparseable
+    # survives verbatim in yoc_raw.
+    yoc_year: Mapped[int | None] = mapped_column(SmallInteger)
     yoc_raw: Mapped[str | None] = mapped_column(String(100))
     po_reference: Mapped[str | None] = mapped_column(Text)
     volt_level: Mapped[str | None] = mapped_column(String(50))
@@ -150,6 +154,7 @@ class SubstationEquipment(Base):
     make: Mapped[str | None] = mapped_column(String(150))
     vector_group: Mapped[str | None] = mapped_column(String(50))
     year_of_commissioning: Mapped[date | None] = mapped_column(Date)
+    yoc_year: Mapped[int | None] = mapped_column(SmallInteger)
     yoc_raw: Mapped[str | None] = mapped_column(String(100))
     po_reference: Mapped[str | None] = mapped_column(Text)
 

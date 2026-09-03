@@ -1,0 +1,74 @@
+-- 1. Verify what got created
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'gis' ORDER BY table_name;
+
+SELECT version_num FROM gis.alembic_version;
+
+
+-- A. Values that will NOT survive a numeric cast
+SELECT 'primary_mva_cap' AS col, count(*) AS bad_rows
+FROM legacy_raw."substations-template"
+WHERE nullif(btrim(primary_mva_cap), '') IS NOT NULL
+  AND btrim(primary_mva_cap) !~ '^[0-9]+(\.[0-9]+)?$'
+UNION ALL
+SELECT 'no_of_ptrs', count(*)
+FROM legacy_raw."substations-template"
+WHERE nullif(btrim(no_of_ptrs), '') IS NOT NULL
+  AND btrim(no_of_ptrs) !~ '^[0-9]+$'
+UNION ALL
+SELECT 'longitude', count(*)
+FROM legacy_raw."substations-template"
+WHERE nullif(btrim(longitude), '') IS NOT NULL
+  AND btrim(longitude) !~ '^-?[0-9]+(\.[0-9]+)?$'
+UNION ALL
+SELECT 'latitude', count(*)
+FROM legacy_raw."substations-template"
+WHERE nullif(btrim(latitude), '') IS NOT NULL
+  AND btrim(latitude) !~ '^-?[0-9]+(\.[0-9]+)?$';
+
+
+
+  -- B. Transformer capacity + year-of-commissioning: how messy across all 9 slots
+SELECT
+  count(*) FILTER (WHERE cap  IS NOT NULL AND cap  !~ '^[0-9]+(\.[0-9]+)?$')     AS bad_capacity,
+  count(*) FILTER (WHERE yoc  IS NOT NULL AND yoc  !~ '^\d{2}\.\d{2}\.\d{4}$')   AS non_ddmmyyyy_yoc,
+  count(*) FILTER (WHERE cap  IS NOT NULL)                                       AS total_ptr_slots
+FROM (
+  SELECT nullif(btrim(t.cap), '') AS cap, nullif(btrim(t.yoc), '') AS yoc
+  FROM legacy_raw."substations-template" s
+  CROSS JOIN LATERAL (VALUES
+    (s.ptr1_cap, s.ptr1_yoc), (s.ptr2_cap, s.ptr2_yoc), (s.ptr3_cap, s.ptr3_yoc),
+    (s.ptr4_cap, s.ptr4_yoc), (s.ptr5_cap, s.ptr5_yoc), (s.ptr6_cap, s.ptr6_yoc),
+    (s.ptr7_cap, s.ptr7_yoc), (s.ptr8_cap, s.ptr8_yoc), (s.ptr9_cap, s.ptr9_yoc)
+  ) AS t(cap, yoc)
+) x;
+
+
+-- C. A sample of the non-date yoc values, so I know what to expect
+SELECT DISTINCT btrim(yoc) AS yoc_value
+FROM legacy_raw."substations-template" s
+CROSS JOIN LATERAL (VALUES
+  (s.ptr1_yoc),(s.ptr2_yoc),(s.ptr3_yoc),(s.ptr4_yoc),(s.ptr5_yoc),
+  (s.ptr6_yoc),(s.ptr7_yoc),(s.ptr8_yoc),(s.ptr9_yoc)
+) AS t(yoc)
+WHERE nullif(btrim(yoc), '') IS NOT NULL
+  AND btrim(yoc) !~ '^\d{2}\.\d{2}\.\d{4}$'
+LIMIT 40;
+
+
+-- D. Boundary polygons: how many substations have enough points to form one
+SELECT pt_count, count(*) AS substations
+FROM (
+  SELECT s.ss_codes, count(*) FILTER (
+    WHERE nullif(btrim(p.lon),'') ~ '^-?[0-9]+(\.[0-9]+)?$'
+      AND nullif(btrim(p.lat),'') ~ '^-?[0-9]+(\.[0-9]+)?$'
+  ) AS pt_count
+  FROM legacy_raw."substations-template" s
+  CROSS JOIN LATERAL (VALUES
+    (s.long1,s.lat1),(s.long2,s.lat2),(s.long3,s.lat3),(s.long4,s.lat4),(s.long5,s.lat5),
+    (s.long6,s.lat6),(s.long7,s.lat7),(s.long8,s.lat8),(s.long9,s.lat9),(s.long10,s.lat10),
+    (s.long11,s.lat11),(s.long12,s.lat12),(s.long13,s.lat13),(s.long14,s.lat14),(s.long15,s.lat15)
+  ) AS p(lon, lat)
+  GROUP BY s.ss_codes
+) c
+GROUP BY pt_count ORDER BY pt_count;
