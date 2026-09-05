@@ -9,6 +9,7 @@ Run them in order.
 | `002_add_yoc_year.sql` | Adds `yoc_year` to `transformer` and `substation_equipment`. Stamps `'0002'`. |
 | `003_add_line_tower.sql` | Adds `gis.line` and `gis.tower`. Stamps `'0003'`. |
 | `101_backfill_lines_towers.sql` | Loads `lines-template` and `Feeders-Towers-template`, then builds each line's route polyline. Needs `100` to have run (helper functions). Re-runnable. |
+| `004_widen_text_columns.sql` | Sizes the line/tower text columns from measured data. Stamps `'0004'`. |
 | `100_backfill_substations.sql` | Loads `legacy_raw."substations-template"` into `gis.substation` / `transformer` / `substation_equipment`. Re-runnable. |
 | `001_initial_core_rollback.sql` | Drops everything `001` created. |
 
@@ -19,6 +20,7 @@ data loads and have no Alembic counterpart.
 psql -h 172.17.4.194 -U postgres -d gisdata -f 001_initial_core.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 002_add_yoc_year.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 003_add_line_tower.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 004_widen_text_columns.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 100_backfill_substations.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 101_backfill_lines_towers.sql
 ```
@@ -87,3 +89,25 @@ stale. Passing NULL rebuilds every feeder.
 The report at the end lists routes more than twice their recorded `length_ckm`,
 which is the clearest sign that a feeder's towers are being joined in the wrong
 order and the polyline is zig-zagging.
+
+
+## Column widths
+
+`varchar(n)` is used only where a real domain rule exists - usernames,
+external codes, voltage class, administrative names. Descriptive free-text
+columns are `text`.
+
+The first line/tower load failed on `tower.location_no`, which holds values up
+to 74 characters against a guessed `varchar(50)`. `diag_column_widths.sql`
+measures the real maximum length of every bounded column against its target;
+run it before adding new ones rather than picking widths by eye.
+
+Two findings from that pass worth keeping in mind:
+
+- `line.conductor_type` and `line.earth_wire_type` are at exactly 100 of 100.
+  The legacy columns really are `varchar(100)`, so that text was truncated
+  upstream and cannot be recovered - but the new columns are `text`, so editing
+  them in the app will not truncate again.
+- `tower.volt_class` and `tower.towers_utilized` are NULL in all 105,082 rows.
+  The map filters on the *line's* `volt_class` through the join, never the
+  tower's, so `tower.volt_class` carries no index.

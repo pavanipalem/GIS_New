@@ -25,24 +25,24 @@ class Line(Base):
 
     feeder_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
 
-    feeder_name: Mapped[str | None] = mapped_column(String(150))
+    feeder_name: Mapped[str | None] = mapped_column(Text)
     volt_class: Mapped[str | None] = mapped_column(String(50), index=True)
-    from_substation: Mapped[str | None] = mapped_column("from_substation", String(150))
-    to_substation: Mapped[str | None] = mapped_column("to_substation", String(150))
+    from_substation: Mapped[str | None] = mapped_column("from_substation", Text)
+    to_substation: Mapped[str | None] = mapped_column("to_substation", Text)
 
     total_no_of_locations: Mapped[int | None] = mapped_column(Integer)
     length_ckm: Mapped[float | None] = mapped_column(Numeric(12, 3))
     length_of_line: Mapped[float | None] = mapped_column(Numeric(12, 3))
     max_load_in_amp: Mapped[float | None] = mapped_column(Numeric(12, 2))
 
-    circuit_type: Mapped[str | None] = mapped_column(String(100))
-    conductor_type: Mapped[str | None] = mapped_column(String(100))
-    earth_wire_type: Mapped[str | None] = mapped_column(String(100))
+    circuit_type: Mapped[str | None] = mapped_column(Text)
+    conductor_type: Mapped[str | None] = mapped_column(Text)
+    earth_wire_type: Mapped[str | None] = mapped_column(Text)
 
     date_of_charging: Mapped[date | None] = mapped_column(Date)
     last_maintenance_date: Mapped[date | None] = mapped_column(Date)
 
-    jurisdiction: Mapped[str | None] = mapped_column(String(150))
+    jurisdiction: Mapped[str | None] = mapped_column(Text)
     zone: Mapped[str | None] = mapped_column(String(100))
     circle: Mapped[str | None] = mapped_column(String(100))
     sap_fl_code: Mapped[str | None] = mapped_column(String(100))
