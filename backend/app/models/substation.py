@@ -87,14 +87,12 @@ class Substation(Base):
 
     # Geometry (SRID 4326)
     location: Mapped[str | None] = mapped_column(Geography("POINT", srid=4326, spatial_index=False))
+    # Populated only where the legacy long1..long15/lat1..lat15 points already
+    # form a valid ring in their stored order. Nothing in the app renders this
+    # yet - the map draws substations as markers - so no attempt is made to
+    # repair the rings that self-intersect. legacy_raw keeps every point pair
+    # if footprints are ever actually wanted.
     boundary: Mapped[str | None] = mapped_column(Geography("POLYGON", srid=4326, spatial_index=False))
-    # How `boundary` was derived from the legacy long1..long15/lat1..lat15 columns:
-    # "legacy_order" - the stored point order already formed a valid ring
-    # "radial_sort"  - same points, re-ordered by angle about their centroid,
-    #                  because the stored order self-intersected
-    # "convex_hull"  - radial sort still failed; hull of the same points
-    # NULL           - fewer than 3 distinct points, or no polygon possible
-    boundary_method: Mapped[str | None] = mapped_column(String(20))
 
     # Audit
     inserted_by: Mapped[str | None] = mapped_column(String(50))
