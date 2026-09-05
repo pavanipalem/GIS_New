@@ -7,34 +7,45 @@
 -- on the map zig-zags. These checks are meant to break that assumption if
 -- it is wrong, before anything is built on top of it.
 --
--- Read-only.
+-- Read-only. Plain SQL only, no psql backslash commands, so it runs in
+-- pgAdmin. Six result sets; each carries its own "check" label column.
 --
---   psql -h 172.17.4.194 -U postgres -d gisdata -f verify_101_routes.sql
+-- In pgAdmin, run the whole file to step through them, or highlight one
+-- block and execute just that.
 -- =====================================================================
 
-\echo '=== 1. Load counts ==='
-SELECT 'lines'                 AS item, count(*)::text AS value FROM gis.line
-UNION ALL SELECT '  with route',      count(*)::text FROM gis.line WHERE route IS NOT NULL
-UNION ALL SELECT '  no route',        count(*)::text FROM gis.line WHERE route IS NULL
-UNION ALL SELECT 'towers',            count(*)::text FROM gis.tower
-UNION ALL SELECT '  with location',   count(*)::text FROM gis.tower WHERE location IS NOT NULL
-UNION ALL SELECT '  no location',     count(*)::text FROM gis.tower WHERE location IS NULL
-UNION ALL SELECT '  orphan feeder',   count(*)::text FROM gis.tower WHERE feeder_id IS NULL
-UNION ALL SELECT '  no seq_no',       count(*)::text FROM gis.tower WHERE seq_no IS NULL
-UNION ALL SELECT '  outside TG box',  count(*)::text FROM gis.tower
-          WHERE location IS NOT NULL
-            AND NOT ST_Intersects(location,
-                    ST_MakeEnvelope(75.0, 15.0, 85.0, 20.0, 4326)::geography);
 
-\echo ''
-\echo '=== 2. Is seq_no unique within a feeder? (ties make the order ambiguous) ==='
-SELECT
-    count(*) FILTER (WHERE dup_seq > 0)  AS feeders_with_duplicate_seq_no,
-    count(*)                             AS feeders_checked,
-    coalesce(sum(dup_seq), 0)            AS total_duplicate_seq_values
+-- =====================================================================
+-- CHECK 1 — load counts
+-- =====================================================================
+SELECT '1. load counts' AS check, item, value
 FROM (
-    SELECT feeder_id,
-           count(*) FILTER (WHERE n > 1) AS dup_seq
+    SELECT 1 AS ord, 'lines' AS item, count(*)::text AS value FROM gis.line
+    UNION ALL SELECT 2, '  with route',    count(*)::text FROM gis.line WHERE route IS NOT NULL
+    UNION ALL SELECT 3, '  no route',      count(*)::text FROM gis.line WHERE route IS NULL
+    UNION ALL SELECT 4, 'towers',          count(*)::text FROM gis.tower
+    UNION ALL SELECT 5, '  with location', count(*)::text FROM gis.tower WHERE location IS NOT NULL
+    UNION ALL SELECT 6, '  no location',   count(*)::text FROM gis.tower WHERE location IS NULL
+    UNION ALL SELECT 7, '  orphan feeder', count(*)::text FROM gis.tower WHERE feeder_id IS NULL
+    UNION ALL SELECT 8, '  no seq_no',     count(*)::text FROM gis.tower WHERE seq_no IS NULL
+    UNION ALL SELECT 9, '  outside TG box', count(*)::text FROM gis.tower
+              WHERE location IS NOT NULL
+                AND NOT ST_Intersects(location,
+                        ST_MakeEnvelope(75.0, 15.0, 85.0, 20.0, 4326)::geography)
+) t
+ORDER BY ord;
+
+
+-- =====================================================================
+-- CHECK 2 — is seq_no unique within a feeder?
+-- Ties make the order ambiguous, so the polyline is arbitrary between them.
+-- =====================================================================
+SELECT '2. seq_no uniqueness' AS check,
+       count(*) FILTER (WHERE dup_seq > 0)  AS feeders_with_duplicate_seq_no,
+       count(*)                             AS feeders_checked,
+       coalesce(sum(dup_seq), 0)            AS duplicate_seq_values
+FROM (
+    SELECT feeder_id, count(*) FILTER (WHERE n > 1) AS dup_seq
     FROM (
         SELECT feeder_id, seq_no, count(*) AS n
         FROM gis.tower
@@ -44,20 +55,23 @@ FROM (
     GROUP BY feeder_id
 ) f;
 
-\echo ''
-\echo '=== 3. THE KEY TEST: drawn route length vs recorded circuit length ==='
-\echo '    A route ordered correctly tracks length_ckm closely. A zig-zagging'
-\echo '    one is far longer. Anything above ~1.5 is suspicious.'
-SELECT bucket, count(*) AS feeders
+
+-- =====================================================================
+-- CHECK 3 — THE KEY TEST
+-- Drawn route length vs recorded circuit length. A correctly ordered route
+-- tracks length_ckm closely; a zig-zagging one is far longer.
+-- Bucketed, so a few bad rows are distinguishable from a systemic problem.
+-- =====================================================================
+SELECT '3. route_km / length_ckm' AS check, bucket, count(*) AS feeders
 FROM (
     SELECT CASE
-             WHEN r IS NULL          THEN 'n/a (no length_ckm)'
-             WHEN r < 0.5            THEN 'a. under 0.5  (route too short?)'
-             WHEN r < 1.1            THEN 'b. 0.5 - 1.1  GOOD'
-             WHEN r < 1.5            THEN 'c. 1.1 - 1.5  plausible'
-             WHEN r < 2.0            THEN 'd. 1.5 - 2.0  suspicious'
-             WHEN r < 5.0            THEN 'e. 2.0 - 5.0  likely wrong order'
-             ELSE                         'f. over 5.0   wrong order'
+             WHEN r IS NULL THEN 'g. n/a (no length_ckm)'
+             WHEN r < 0.5   THEN 'a. under 0.5  route too short?'
+             WHEN r < 1.1   THEN 'b. 0.5 - 1.1  GOOD'
+             WHEN r < 1.5   THEN 'c. 1.1 - 1.5  plausible'
+             WHEN r < 2.0   THEN 'd. 1.5 - 2.0  suspicious'
+             WHEN r < 5.0   THEN 'e. 2.0 - 5.0  likely wrong order'
+             ELSE                'f. over 5.0   wrong order'
            END AS bucket
     FROM (
         SELECT CASE WHEN length_ckm > 0
@@ -69,18 +83,20 @@ FROM (
 GROUP BY bucket
 ORDER BY bucket;
 
-\echo ''
-\echo '=== 4. A second, independent check: longest single hop per feeder ==='
-\echo '    Towers on a corridor sit a few hundred metres apart. A route with'
-\echo '    a 20km jump in the middle is joining towers in the wrong order,'
-\echo '    and this does not depend on length_ckm being accurate.'
-SELECT bucket, count(*) AS feeders
+
+-- =====================================================================
+-- CHECK 4 — independent of length_ckm
+-- Longest single hop per feeder. Towers on a corridor sit a few hundred
+-- metres apart, so a 20km jump mid-route means the order is wrong. This
+-- does not rely on length_ckm being accurate.
+-- =====================================================================
+SELECT '4. longest hop per feeder' AS check, bucket, count(*) AS feeders
 FROM (
     SELECT CASE
-             WHEN maxhop_km < 2   THEN 'a. under 2km   GOOD'
-             WHEN maxhop_km < 5   THEN 'b. 2 - 5km     plausible'
-             WHEN maxhop_km < 15  THEN 'c. 5 - 15km    suspicious'
-             ELSE                      'd. over 15km   wrong order'
+             WHEN maxhop_km < 2  THEN 'a. under 2km   GOOD'
+             WHEN maxhop_km < 5  THEN 'b. 2 - 5km     plausible'
+             WHEN maxhop_km < 15 THEN 'c. 5 - 15km    suspicious'
+             ELSE                     'd. over 15km   wrong order'
            END AS bucket
     FROM (
         SELECT l.feeder_id,
@@ -98,9 +114,12 @@ FROM (
 GROUP BY bucket
 ORDER BY bucket;
 
-\echo ''
-\echo '=== 5. The 15 worst offenders, to eyeball ==='
-SELECT l.feeder_id, left(l.feeder_name, 42) AS feeder_name, l.volt_class,
+
+-- =====================================================================
+-- CHECK 5 — the 15 worst offenders, to eyeball
+-- =====================================================================
+SELECT '5. worst ratios' AS check,
+       l.feeder_id, left(l.feeder_name, 40) AS feeder_name, l.volt_class,
        l.tower_count,
        round((ST_Length(l.route) / 1000)::numeric, 1) AS route_km,
        l.length_ckm,
@@ -110,10 +129,12 @@ WHERE l.route IS NOT NULL AND l.length_ckm > 0
 ORDER BY (ST_Length(l.route) / 1000) / l.length_ckm DESC
 LIMIT 15;
 
-\echo ''
-\echo '=== 6. Does ordering by location_no instead do any better? ==='
-\echo '    If this total is much lower than the seq_no one, the ordering'
-\echo '    rule is backwards and needs changing.'
+
+-- =====================================================================
+-- CHECK 6 — is the ordering rule simply backwards?
+-- Recompute every route ordered by location_no instead and compare total
+-- drawn kilometres. Shorter total = better order.
+-- =====================================================================
 WITH by_seq AS (
     SELECT sum(ST_Length(route) / 1000.0) AS km FROM gis.line WHERE route IS NOT NULL
 ),
@@ -133,8 +154,9 @@ by_loc AS (
         HAVING count(*) >= 2
     ) m
 )
-SELECT round(by_seq.km::numeric, 0)  AS total_km_ordered_by_seq_no,
-       round(by_loc.km::numeric, 0)  AS total_km_ordered_by_location_no,
+SELECT '6. seq_no vs location_no' AS check,
+       round(by_seq.km::numeric, 0) AS total_km_by_seq_no,
+       round(by_loc.km::numeric, 0) AS total_km_by_location_no,
        CASE WHEN by_seq.km <= by_loc.km
             THEN 'seq_no is the better order (expected)'
             ELSE 'location_no is better - THE ORDERING RULE IS WRONG'
