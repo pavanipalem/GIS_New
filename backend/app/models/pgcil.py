@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from geoalchemy2 import Geography
-from sqlalchemy import Identity, Numeric, String, Text
+from sqlalchemy import Identity, Index, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -26,6 +26,9 @@ class PgcilSubstation(Base):
     describing a separate network. No natural PK in the source."""
 
     __tablename__ = "pgcil_substation"
+    __table_args__ = (
+        Index("ix_pgcil_substation_location", "location", postgresql_using="gist"),
+    )
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     voltage: Mapped[str | None] = mapped_column(Text)
@@ -39,6 +42,9 @@ class HydelPowerStation(Base):
     """legacy_raw.hydelpowerstations (11 rows)."""
 
     __tablename__ = "hydel_power_station"
+    __table_args__ = (
+        Index("ix_hydel_power_station_location", "location", postgresql_using="gist"),
+    )
 
     hydel_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
     name: Mapped[str | None] = mapped_column(String(255))
@@ -63,6 +69,10 @@ class PgcilLine(Base):
     existed to validate or reject."""
 
     __tablename__ = "pgcil_line"
+    __table_args__ = (
+        Index("ix_pgcil_line_location", "location", postgresql_using="gist"),
+        Index("ix_pgcil_line_feeder_name", "feeder_name"),
+    )
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     feeder_name: Mapped[str | None] = mapped_column(Text)

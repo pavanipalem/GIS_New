@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, SmallInteger, String, Text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -26,10 +35,15 @@ from app.models.line import Line
 
 class Tower(Base):
     __tablename__ = "tower"
+    __table_args__ = (
+        Index("ix_tower_location", "location", postgresql_using="gist"),
+        Index("ix_tower_feeder_id", "feeder_id"),
+        Index("ix_tower_feeder_seq", "feeder_id", "seq_no"),
+    )
 
     tower_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     feeder_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("line.feeder_id", ondelete="SET NULL"), index=True
+        Integer, ForeignKey("line.feeder_id", ondelete="SET NULL")
     )
 
     location: Mapped[str | None] = mapped_column(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Date, DateTime, Integer, Numeric, String, Text
+from sqlalchemy import Date, DateTime, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -22,11 +22,16 @@ from app.core.db import Base
 
 class Line(Base):
     __tablename__ = "line"
+    __table_args__ = (
+        Index("ix_line_route", "route", postgresql_using="gist"),
+        Index("ix_line_volt_class", "volt_class"),
+        Index("ix_line_zone_circle", "zone", "circle"),
+    )
 
     feeder_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
 
     feeder_name: Mapped[str | None] = mapped_column(Text)
-    volt_class: Mapped[str | None] = mapped_column(String(50), index=True)
+    volt_class: Mapped[str | None] = mapped_column(String(50))
     from_substation: Mapped[str | None] = mapped_column("from_substation", Text)
     to_substation: Mapped[str | None] = mapped_column("to_substation", Text)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Date, DateTime, Numeric, String, Text
+from sqlalchemy import BigInteger, Date, DateTime, Index, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -14,8 +14,11 @@ from app.core.db import Base
 
 class SolarPlant(Base):
     __tablename__ = "solar_plant"
+    __table_args__ = (
+        Index("ix_solar_plant_location", "location", postgresql_using="gist"),
+    )
 
-    solar_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    solar_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
     plant_name: Mapped[str | None] = mapped_column(Text)
     location_desc: Mapped[str | None] = mapped_column(Text)

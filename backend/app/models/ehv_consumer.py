@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from geoalchemy2 import Geography
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -12,8 +12,12 @@ from app.models.line import Line
 
 class EhvConsumer(Base):
     __tablename__ = "ehv_consumer"
+    __table_args__ = (
+        Index("ix_ehv_consumer_location", "location", postgresql_using="gist"),
+        Index("ix_ehv_consumer_feeder_id", "feeder_id"),
+    )
 
-    ehv_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    ehv_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
     name: Mapped[str | None] = mapped_column(Text)
     location_desc: Mapped[str | None] = mapped_column(Text)
@@ -24,7 +28,7 @@ class EhvConsumer(Base):
     )
 
     feeder_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("line.feeder_id", ondelete="SET NULL"), index=True
+        Integer, ForeignKey("line.feeder_id", ondelete="SET NULL")
     )
     feeder_name: Mapped[str | None] = mapped_column(Text)
     substation: Mapped[str | None] = mapped_column(Text)

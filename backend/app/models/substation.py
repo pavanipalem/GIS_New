@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Identity,
+    Index,
     Numeric,
     SmallInteger,
     String,
@@ -42,6 +43,12 @@ class EquipmentKind(str, enum.Enum):
 
 class Substation(Base):
     __tablename__ = "substation"
+    __table_args__ = (
+        Index("ix_substation_location", "location", postgresql_using="gist"),
+        Index("ix_substation_boundary", "boundary", postgresql_using="gist"),
+        Index("ix_substation_volt_class", "volt_class"),
+        Index("ix_substation_zone_circle", "zone", "circle"),
+    )
 
     ss_code: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
 
@@ -118,11 +125,14 @@ class Substation(Base):
 
 class Transformer(Base):
     __tablename__ = "transformer"
-    __table_args__ = (UniqueConstraint("ss_code", "slot_no"),)
+    __table_args__ = (
+        UniqueConstraint("ss_code", "slot_no", name="uq_transformer_ss_code"),
+        Index("ix_transformer_ss_code", "ss_code"),
+    )
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     ss_code: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("substation.ss_code", ondelete="CASCADE"), index=True
+        BigInteger, ForeignKey("substation.ss_code", ondelete="CASCADE")
     )
     slot_no: Mapped[int] = mapped_column(SmallInteger)  # 1..9, the legacy ptrN index
 
@@ -145,13 +155,14 @@ class Transformer(Base):
 
 class SubstationEquipment(Base):
     __tablename__ = "substation_equipment"
+    __table_args__ = (Index("ix_substation_equipment_ss_code", "ss_code"),)
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     ss_code: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("substation.ss_code", ondelete="CASCADE"), index=True
+        BigInteger, ForeignKey("substation.ss_code", ondelete="CASCADE")
     )
     kind: Mapped[EquipmentKind] = mapped_column(
-        Enum(EquipmentKind, name="equipment_kind", native_enum=True)
+        Enum(EquipmentKind, name="equipment_kind", native_enum=True, schema="gis")
     )
 
     capacity_mva: Mapped[float | None] = mapped_column(Numeric(12, 2))
