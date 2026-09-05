@@ -9,7 +9,9 @@ Run them in order.
 | `002_add_yoc_year.sql` | Adds `yoc_year` to `transformer` and `substation_equipment`. Stamps `'0002'`. |
 | `003_add_line_tower.sql` | Adds `gis.line` and `gis.tower`. Stamps `'0003'`. |
 | `101_backfill_lines_towers.sql` | Loads `lines-template` and `Feeders-Towers-template`, then builds each line's route polyline. Needs `100` to have run (helper functions). Re-runnable. |
+| `102_backfill_solar_ehv_pgcil_hydel.sql` | Loads `Solar Plants`, `ehvconsumers`, `pgcil`, `hydelpowerstations`, `pgcillines`. Needs `100` to have run. Re-runnable. |
 | `004_widen_text_columns.sql` | Sizes the line/tower text columns from measured data. Stamps `'0004'`. |
+| `005_add_solar_ehv_pgcil_hydel.sql` | Adds `gis.solar_plant`, `gis.ehv_consumer`, and three read-only reference tables. Stamps `'0005'`. |
 | `100_backfill_substations.sql` | Loads `legacy_raw."substations-template"` into `gis.substation` / `transformer` / `substation_equipment`. Re-runnable. |
 | `001_initial_core_rollback.sql` | Drops everything `001` created. |
 
@@ -22,7 +24,9 @@ psql -h 172.17.4.194 -U postgres -d gisdata -f 002_add_yoc_year.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 003_add_line_tower.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 004_widen_text_columns.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 100_backfill_substations.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 005_add_solar_ehv_pgcil_hydel.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 101_backfill_lines_towers.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 102_backfill_solar_ehv_pgcil_hydel.sql
 ```
 
 ## The backfill
@@ -111,3 +115,15 @@ Two findings from that pass worth keeping in mind:
 - `tower.volt_class` and `tower.towers_utilized` are NULL in all 105,082 rows.
   The map filters on the *line's* `volt_class` through the join, never the
   tower's, so `tower.volt_class` carries no index.
+
+
+## Read-only reference layers
+
+`pgcil_substation`, `hydel_power_station` and `pgcil_line` get no service-layer
+create/update/delete: no stored procedure in the legacy system ever inserts or
+updates any of the three source tables, and only `MapView.aspx` references
+them, for display. Building a write path here would be speculative work for a
+need that has never existed.
+
+`pgcil_line` in particular has **no ordering column at all** in its source -
+not even a `location_no`. It is loaded as individual points, not a route.

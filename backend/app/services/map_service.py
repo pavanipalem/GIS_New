@@ -1,0 +1,180 @@
+from __future__ import annotations
+
+import json
+
+from fastapi import HTTPException, status
+from geoalchemy2 import Geography, Geometry
+from sqlalchemy import cast, func, select
+from sqlalchemy.orm import Session
+
+from app.models.ehv_consumer import EhvConsumer
+from app.models.line import Line
+from app.models.pgcil import HydelPowerStation, PgcilLine, PgcilSubstation
+from app.models.solar_plant import SolarPlant
+from app.models.substation import Substation
+from app.models.tower import Tower
+from app.schemas.map import (
+    CountByCategory,
+    EhvConsumerMarker,
+    HydelPowerStationMarker,
+    LineFeature,
+    MapPoint,
+    PgcilLineMarker,
+    PgcilSubstationMarker,
+    SolarPlantMarker,
+    SubstationLookup,
+    SubstationMarker,
+    TowerMarker,
+)
+
+# Substation types the legacy map excludes from every voltage-filtered view
+# (GetMapData flags 1-8: "ss_type not in ('LIS','LI','WW')"). The lookup/
+# search flag (10) does NOT apply this filter, so list_substation_lookup
+# below deliberately does not either - that split is preserved from the
+# legacy proc, not invented here.
+_EXCLUDED_SS_TYPES = ("LIS", "LI", "WW")
+
+
+def _lat(col):
+    return func.ST_Y(cast(col, Geometry)).label("lat")
+
+
+def _lng(col):
+    return func.ST_X(cast(col, Geometry)).label("lng")
+
+
+# --------------------------------------------------------------- substations
+def list_substations(db: Session, volt_class: str | None = None) -> list[SubstationMarker]:
+    stmt = (
+        select(
+            Substation.ss_code, Substation.ss_name, Substation.ss_type,
+            Substation.volt_class, Substation.no_of_ptrs, Substation.ss_doc,
+            _lat(Substation.location), _lng(Substation.location),
+        )
+        .where(Substation.location.isnot(None))
+        .where(Substation.ss_type.notin_(_EXCLUDED_SS_TYPES))
+    )
+    if volt_class:
+        stmt = stmt.where(Substation.volt_class == volt_class)
+    return [SubstationMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def substation_summary(db: Session) -> list[CountByCategory]:
+    stmt = (
+        select(Substation.volt_class, func.count(Substation.ss_code))
+        .where(Substation.ss_type.notin_(_EXCLUDED_SS_TYPES))
+        .group_by(Substation.volt_class)
+        .order_by(Substation.volt_class)
+    )
+    return [CountByCategory(category=c or "unknown", count=n) for c, n in db.execute(stmt)]
+
+
+def list_substation_lookup(db: Session) -> list[SubstationLookup]:
+    stmt = (
+        select(
+            Substation.ss_code,
+            func.coalesce(Substation.ss_name, "")
+            .concat(" ")
+            .concat(func.coalesce(Substation.volt_class, ""))
+            .label("title"),
+            _lat(Substation.location), _lng(Substation.location),
+        )
+        .where(Substation.location.isnot(None))
+    )
+    return [SubstationLookup(**row._mapping) for row in db.execute(stmt)]
+
+
+# ---------------------------------------------------------------- solar/ehv
+def list_solar_plants(db: Session) -> list[SolarPlantMarker]:
+    stmt = select(
+        SolarPlant.solar_id, SolarPlant.plant_name, SolarPlant.installed_capacity_mw,
+        SolarPlant.interfacing_ss, _lat(SolarPlant.location), _lng(SolarPlant.location),
+    ).where(SolarPlant.location.isnot(None))
+    return [SolarPlantMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def list_ehv_consumers(db: Session) -> list[EhvConsumerMarker]:
+    stmt = select(
+        EhvConsumer.ehv_id, EhvConsumer.name, EhvConsumer.installed_capacity_mw,
+        EhvConsumer.substation, EhvConsumer.feeder_id,
+        _lat(EhvConsumer.location), _lng(EhvConsumer.location),
+    ).where(EhvConsumer.location.isnot(None))
+    return [EhvConsumerMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+# --------------------------------------------------------------------- lines
+def list_lines(db: Session, volt_class: str | None = None) -> list[LineFeature]:
+    stmt = select(
+        Line.feeder_id, Line.feeder_name, Line.volt_class,
+        Line.from_substation, Line.to_substation, Line.tower_count, Line.length_ckm,
+        func.ST_AsGeoJSON(cast(Line.route, Geometry)).label("geojson"),
+    ).where(Line.route.isnot(None))
+    if volt_class:
+        stmt = stmt.where(Line.volt_class == volt_class)
+
+    out = []
+    for row in db.execute(stmt):
+        m = row._mapping
+        coords = json.loads(m["geojson"])["coordinates"]  # GeoJSON is [lng, lat]
+        path = [MapPoint(lat=c[1], lng=c[0]) for c in coords]
+        out.append(LineFeature(**{k: v for k, v in m.items() if k != "geojson"}, path=path))
+    return out
+
+
+# -------------------------------------------------------------------- towers
+def list_towers(
+    db: Session,
+    feeder_id: int | None = None,
+    near_lat: float | None = None,
+    near_lng: float | None = None,
+    radius_km: float | None = None,
+) -> list[TowerMarker]:
+    """Towers are never returned unfiltered - 105k rows would flood the map
+    and every legacy caller (per-feeder view, radius search) scoped the
+    query the same way. Require one of the two filters."""
+    if feeder_id is None and (near_lat is None or near_lng is None or radius_km is None):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Provide feeder_id, or near_lat + near_lng + radius_km",
+        )
+
+    stmt = select(
+        Tower.tower_id, Tower.feeder_id, Tower.seq_no, Tower.location_no, Tower.tower_type,
+        _lat(Tower.location), _lng(Tower.location),
+    ).where(Tower.location.isnot(None))
+
+    if feeder_id is not None:
+        stmt = stmt.where(Tower.feeder_id == feeder_id).order_by(Tower.seq_no)
+    else:
+        point = func.ST_SetSRID(func.ST_MakePoint(near_lng, near_lat), 4326)
+        stmt = stmt.where(
+            func.ST_DWithin(Tower.location, cast(point, Geography), radius_km * 1000)
+        )
+
+    return [TowerMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+# --------------------------------------------------------- reference layers
+def list_pgcil_substations(db: Session) -> list[PgcilSubstationMarker]:
+    stmt = select(
+        PgcilSubstation.id, PgcilSubstation.voltage, PgcilSubstation.name,
+        _lat(PgcilSubstation.location), _lng(PgcilSubstation.location),
+    ).where(PgcilSubstation.location.isnot(None))
+    return [PgcilSubstationMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def list_hydel_power_stations(db: Session) -> list[HydelPowerStationMarker]:
+    stmt = select(
+        HydelPowerStation.hydel_id, HydelPowerStation.name, HydelPowerStation.gen_cap_mw,
+        HydelPowerStation.connected_ss,
+        _lat(HydelPowerStation.location), _lng(HydelPowerStation.location),
+    ).where(HydelPowerStation.location.isnot(None))
+    return [HydelPowerStationMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def list_pgcil_lines(db: Session) -> list[PgcilLineMarker]:
+    stmt = select(
+        PgcilLine.id, PgcilLine.feeder_name,
+        _lat(PgcilLine.location), _lng(PgcilLine.location),
+    ).where(PgcilLine.location.isnot(None))
+    return [PgcilLineMarker(**row._mapping) for row in db.execute(stmt)]
