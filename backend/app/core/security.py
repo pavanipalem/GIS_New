@@ -1,30 +1,38 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 TokenType = Literal["access", "refresh"]
 
-# Sentinel hash for seeded legacy users: valid bcrypt hash of an unguessable
-# random value, so verification always fails until the user resets.
+# bcrypt hard-limits input to 72 bytes and (since 4.x) raises instead of
+# silently truncating - enforce the same limit here so hash/verify never
+# raise on a long password. Pydantic schemas also cap password length to 72
+# so this should never actually trigger from a real request.
+_MAX_PASSWORD_BYTES = 72
+
+# Sentinel hash for seeded legacy users: syntactically valid bcrypt hash of
+# an unreachable value ('.' is 0 in bcrypt's base64 alphabet), so
+# verification always fails until the user resets.
 UNUSABLE_PASSWORD_HASH = "$2b$12$" + "." * 53
 
 
 def hash_password(raw: str) -> str:
-    return _pwd.hash(raw)
+    raw_bytes = raw.encode("utf-8")[:_MAX_PASSWORD_BYTES]
+    return bcrypt.hashpw(raw_bytes, bcrypt.gensalt()).decode("ascii")
 
 
 def verify_password(raw: str, hashed: str) -> bool:
-    if not hashed or hashed == UNUSABLE_PASSWORD_HASH:
+    if not hashed:
         return False
+    raw_bytes = raw.encode("utf-8")[:_MAX_PASSWORD_BYTES]
     try:
-        return _pwd.verify(raw, hashed)
+        return bcrypt.checkpw(raw_bytes, hashed.encode("ascii"))
     except ValueError:
+        # malformed hash (shouldn't happen for anything we've stored)
         return False
 
 

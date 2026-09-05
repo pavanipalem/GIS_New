@@ -21,7 +21,9 @@ class RefreshRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1)
-    new_password: str = Field(min_length=8, max_length=128)
+    # bcrypt hard-limits input to 72 bytes; cap here so the length in the
+    # request matches what actually gets hashed.
+    new_password: str = Field(min_length=8, max_length=72)
 
 
 class CurrentUser(BaseModel):

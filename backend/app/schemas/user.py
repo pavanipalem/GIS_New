@@ -14,7 +14,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     # If omitted, a random temp password is generated and returned once.
-    password: str | None = Field(default=None, min_length=8, max_length=128)
+    # bcrypt hard-limits input to 72 bytes; cap here so the length in the
+    # request matches what actually gets hashed.
+    password: str | None = Field(default=None, min_length=8, max_length=72)
 
 
 class UserUpdate(BaseModel):
