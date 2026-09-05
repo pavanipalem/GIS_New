@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from geoalchemy2 import Geography
 from sqlalchemy import Date, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +47,14 @@ class Line(Base):
     circle: Mapped[str | None] = mapped_column(String(100))
     sap_fl_code: Mapped[str | None] = mapped_column(String(100))
     additional_info: Mapped[str | None] = mapped_column(Text)
+
+    # The route drawn on the map: this line's towers joined in seq_no order.
+    # Derived, not source data - rebuild it whenever a tower on this feeder
+    # moves, is added or is removed (gis.rebuild_line_routes()).
+    route: Mapped[str | None] = mapped_column(
+        Geography("LINESTRING", srid=4326, spatial_index=False)
+    )
+    tower_count: Mapped[int | None] = mapped_column(Integer)
 
     inserted_by: Mapped[str | None] = mapped_column(String(50))
     inserted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
