@@ -7,18 +7,23 @@ Run them in order.
 |---|---|
 | `001_initial_core.sql` | Schema `gis`, both enums, four core tables + indexes. Stamps `alembic_version = '0001'`. |
 | `002_add_yoc_year.sql` | Adds `yoc_year` to `transformer` and `substation_equipment`. Stamps `'0002'`. |
-| `003_backfill_substations.sql` | Loads `legacy_raw."substations-template"` into `gis.substation` / `transformer` / `substation_equipment`. Re-runnable. |
+| `003_add_boundary_method.sql` | Adds `substation.boundary_method`. Stamps `'0003'`. |
+| `100_backfill_substations.sql` | Loads `legacy_raw."substations-template"` into `gis.substation` / `transformer` / `substation_equipment`. Re-runnable. |
 | `001_initial_core_rollback.sql` | Drops everything `001` created. |
+
+`0xx` files are schema changes and mirror `alembic/versions/`. `1xx` files are
+data loads and have no Alembic counterpart.
 
 ```bash
 psql -h 172.17.4.194 -U postgres -d gisdata -f 001_initial_core.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 002_add_yoc_year.sql
-psql -h 172.17.4.194 -U postgres -d gisdata -f 003_backfill_substations.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 003_add_boundary_method.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 100_backfill_substations.sql
 ```
 
 ## The backfill
 
-`003` truncates the three `gis` tables and rebuilds them from `legacy_raw`, so
+`100` truncates the three `gis` tables and rebuilds them from `legacy_raw`, so
 you can adjust a parsing rule and run it again. It never writes to `legacy_raw`.
 
 It installs four helper functions in the `gis` schema:
@@ -33,15 +38,32 @@ It installs four helper functions in the `gis` schema:
 ### Decisions baked into the parsing
 
 - **Dates are day-first.** `7/8/2009` is 7 August 2009, `10-1-2015` is 10 January 2015.
-- **Two-digit years** ≤ 40 map to 2000s, otherwise 1900s. `18-09-15` is 2015.
+- **Two-digit years** 40 or under map to 2000s, otherwise 1900s. `18-09-15` is 2015.
 - **Year-only values** (`2024`, `1985`) fill `yoc_year` and leave
   `year_of_commissioning` NULL. The original text always survives in `yoc_raw`.
-- **Boundaries** need ≥ 3 distinct points. 195 of the 408 substations carry a
-  single point, so they get `location` only and `boundary = NULL`. Duplicate
-  coordinates are dropped (the legacy rows often repeat point 1 to close the
-  ring) and the ring is re-closed explicitly. A ring that will not form a valid
-  polygon is repaired with `ST_MakeValid`; if that yields anything but one
-  polygon the boundary stays NULL and the row is listed in the report.
 
-The script ends with a summary and a list of any substation that had enough
-points but still failed to produce a polygon.
+### Boundary polygons
+
+The legacy `long1/lat1 .. long15/lat15` columns store points in **data-entry
+order, not ring order**. Joining them 1 to 2 to 3 and so on self-intersects for
+57 of the 213 substations that carry three or more points.
+
+Discarding those loses a quarter of the polygons, and picking a piece out of an
+`ST_MakeValid` result is meaningless (a repaired bowtie is two triangles). So
+the ring is rebuilt from the same vertices, trying three strategies in order:
+
+| `boundary_method` | Meaning |
+|---|---|
+| `legacy_order` | The stored point order already formed a valid ring. |
+| `radial_sort` | Same points, re-ordered by angle about their centroid. A ring ordered by angle about an interior point cannot self-intersect. |
+| `convex_hull` | Radial sort still failed; the hull of the same points. Loses concavity. |
+| `NULL` | Fewer than 3 distinct points. 195 of the 408 substations carry a single point and get `location` only. |
+
+**`radial_sort` and `convex_hull` boundaries are inferred, not original.** The
+vertices are the legacy ones but the order joining them is ours. The report at
+the end of the script lists every one of them with its area, and the UI should
+consider rendering them differently until someone has checked them against the
+real footprints.
+
+The script ends with a summary, that review list, and a list of any substation
+that had enough points but still failed to produce a polygon.

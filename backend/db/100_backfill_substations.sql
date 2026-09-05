@@ -177,13 +177,26 @@ FROM legacy_raw."substations-template" s;
 -- ---------------------------------------------------------------------
 -- 2. Boundary polygons from long1/lat1 .. long15/lat15
 --
---    195 substations carry a single point and get boundary = NULL.
+--    The legacy columns store points in data-entry order, not ring order,
+--    so joining them 1->2->3->... self-intersects for 57 of the 213
+--    substations that carry three or more points. Rather than discard
+--    those, rebuild the ring from the same vertices, trying in order:
+--
+--      legacy_order  the stored order already forms a valid ring
+--      radial_sort   same points, ordered by angle about their centroid
+--      convex_hull   hull of the same points, if radial sort still fails
+--
+--    The strategy used is recorded in substation.boundary_method, so the
+--    rebuilt ones can be reviewed on the map instead of silently trusted.
+--
+--    195 substations carry a single point and keep boundary = NULL.
 --    Duplicate coordinates (the legacy data often repeats point 1 to close
---    the ring) are dropped, then the ring is closed explicitly.
---    A ring that will not form a valid polygon is repaired with
---    ST_MakeValid; if repair yields anything but one polygon, NULL is kept
---    and the row is listed in the report at the end.
+--    the ring) are dropped before any of this.
 -- ---------------------------------------------------------------------
+-- ST_IsValid raises a NOTICE per self-intersection. Those are expected
+-- here and are what the fallbacks exist for, so quiet them.
+SET LOCAL client_min_messages = warning;
+
 WITH raw_pts AS (
     SELECT s.ss_codes,
            p.ord,
@@ -204,39 +217,62 @@ valid_pts AS (
       AND lon BETWEEN -180 AND 180
       AND lat BETWEEN  -90 AND  90
 ),
--- keep first occurrence of each distinct coordinate, preserving order
+-- keep the first occurrence of each distinct coordinate
 distinct_pts AS (
     SELECT DISTINCT ON (ss_codes, lon, lat) ss_codes, ord, lon, lat
     FROM valid_pts
     ORDER BY ss_codes, lon, lat, ord
 ),
-rings AS (
-    SELECT ss_codes,
-           count(*) AS npts,
-           ST_MakeLine(ST_SetSRID(ST_MakePoint(lon, lat), 4326) ORDER BY ord) AS line
+-- arithmetic centre of the vertices; a ring ordered by angle about an
+-- interior point cannot self-intersect
+centres AS (
+    SELECT ss_codes, avg(lon) AS clon, avg(lat) AS clat
     FROM distinct_pts
     GROUP BY ss_codes
 ),
-polys AS (
+angled AS (
+    SELECT d.ss_codes, d.ord, d.lon, d.lat,
+           atan2(d.lat - c.clat, d.lon - c.clon) AS theta
+    FROM distinct_pts d
+    JOIN centres c USING (ss_codes)
+),
+rings AS (
     SELECT ss_codes,
-           ST_MakePolygon(ST_AddPoint(line, ST_StartPoint(line))) AS geom
+           count(*) AS npts,
+           ST_MakeLine(ST_SetSRID(ST_MakePoint(lon, lat), 4326) ORDER BY ord)   AS line_legacy,
+           ST_MakeLine(ST_SetSRID(ST_MakePoint(lon, lat), 4326) ORDER BY theta) AS line_radial,
+           ST_Collect(ST_SetSRID(ST_MakePoint(lon, lat), 4326))                 AS pts
+    FROM angled
+    GROUP BY ss_codes
+),
+candidates AS (
+    SELECT ss_codes,
+           ST_MakePolygon(ST_AddPoint(line_legacy, ST_StartPoint(line_legacy))) AS poly_legacy,
+           ST_MakePolygon(ST_AddPoint(line_radial, ST_StartPoint(line_radial))) AS poly_radial,
+           ST_ConvexHull(pts)                                                   AS poly_hull
     FROM rings
     WHERE npts >= 3
 ),
-repaired AS (
+chosen AS (
     SELECT ss_codes,
            CASE
-               WHEN ST_IsValid(geom) THEN geom
-               WHEN ST_NumGeometries(ST_CollectionExtract(ST_MakeValid(geom), 3)) = 1
-                   THEN ST_GeometryN(ST_CollectionExtract(ST_MakeValid(geom), 3), 1)
+               WHEN ST_IsValid(poly_legacy)          THEN 'legacy_order'
+               WHEN ST_IsValid(poly_radial)          THEN 'radial_sort'
+               WHEN GeometryType(poly_hull) = 'POLYGON' THEN 'convex_hull'
+           END AS method,
+           CASE
+               WHEN ST_IsValid(poly_legacy)          THEN poly_legacy
+               WHEN ST_IsValid(poly_radial)          THEN poly_radial
+               WHEN GeometryType(poly_hull) = 'POLYGON' THEN poly_hull
            END AS geom
-    FROM polys
+    FROM candidates
 )
 UPDATE gis.substation s
-SET boundary = r.geom::geography
-FROM repaired r
-WHERE s.ss_code = r.ss_codes
-  AND r.geom IS NOT NULL;
+SET boundary        = c.geom::geography,
+    boundary_method = c.method
+FROM chosen c
+WHERE s.ss_code = c.ss_codes
+  AND c.geom IS NOT NULL;
 
 
 -- ---------------------------------------------------------------------
@@ -314,6 +350,12 @@ COMMIT;
 SELECT 'substations'          AS item, count(*)::text AS value FROM gis.substation
 UNION ALL SELECT 'with location',  count(*)::text FROM gis.substation WHERE location IS NOT NULL
 UNION ALL SELECT 'with boundary',  count(*)::text FROM gis.substation WHERE boundary IS NOT NULL
+UNION ALL SELECT '  legacy_order', count(*)::text FROM gis.substation
+          WHERE boundary_method = 'legacy_order'
+UNION ALL SELECT '  radial_sort',  count(*)::text FROM gis.substation
+          WHERE boundary_method = 'radial_sort'
+UNION ALL SELECT '  convex_hull',  count(*)::text FROM gis.substation
+          WHERE boundary_method = 'convex_hull'
 UNION ALL SELECT 'transformers',   count(*)::text FROM gis.transformer
 UNION ALL SELECT '  yoc full date', count(*)::text FROM gis.transformer
           WHERE year_of_commissioning IS NOT NULL
@@ -323,8 +365,18 @@ UNION ALL SELECT '  yoc unparsed',  count(*)::text FROM gis.transformer
           WHERE yoc_year IS NULL AND yoc_raw IS NOT NULL
 UNION ALL SELECT 'equipment rows',  count(*)::text FROM gis.substation_equipment;
 
+-- Boundaries that had to be rebuilt because the stored point order
+-- self-intersected. Worth eyeballing on the map: the vertices are the
+-- legacy ones, but the order joining them is ours, not the original
+-- surveyor's. Rendering these differently in the UI would be reasonable.
+SELECT ss_code, ss_name, boundary_method,
+       round(ST_Area(boundary)::numeric, 1) AS area_m2
+FROM gis.substation
+WHERE boundary_method IN ('radial_sort', 'convex_hull')
+ORDER BY boundary_method, ss_code;
+
 -- Substations that had >= 3 points but still ended up without a polygon
--- (ring could not be repaired into a single valid polygon):
+-- (expected to be empty now that convex hull is the last resort):
 SELECT s.ss_code, s.ss_name
 FROM gis.substation s
 WHERE s.boundary IS NULL
