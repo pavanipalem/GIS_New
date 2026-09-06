@@ -4,6 +4,7 @@ import { solarApi } from "../api/assets";
 import { ApiError } from "../api/client";
 import { AppLayout } from "../components/AppLayout";
 import { useAuth } from "../auth/AuthContext";
+import { BulkExcel } from "../components/BulkExcel";
 import type { SolarPlantFields, SolarPlantOut } from "../types/assets";
 
 const empty = (): SolarPlantFields => ({
@@ -106,6 +107,8 @@ export default function SolarPlantsPage() {
           </button>
         )}
       </div>
+
+      <BulkExcel kind="solar-plants" canEdit={canEdit} onImported={load} />
 
       {error && <p className="auth-error">{error}</p>}
 

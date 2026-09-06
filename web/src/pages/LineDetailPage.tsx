@@ -4,6 +4,7 @@ import { linesApi, towersApi } from "../api/network";
 import { ApiError } from "../api/client";
 import { AppLayout } from "../components/AppLayout";
 import { useAuth } from "../auth/AuthContext";
+import { BulkExcel } from "../components/BulkExcel";
 import type { LineDetail, TowerOut } from "../types/network";
 
 const TOWER_PAGE = 100;
@@ -160,6 +161,8 @@ export default function LineDetailPage() {
           The route on the map is these towers joined in sequence order. Adding, moving or
           deleting one redraws it automatically.
         </p>
+
+        <BulkExcel kind="towers" feederId={line.feeder_id} canEdit={canEdit} onImported={reload} />
 
         {towers.length === 0 ? (
           <p className="empty">No towers on this line.</p>

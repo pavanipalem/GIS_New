@@ -4,6 +4,7 @@ import { linesApi } from "../api/network";
 import { ApiError } from "../api/client";
 import { AppLayout } from "../components/AppLayout";
 import { useAuth } from "../auth/AuthContext";
+import { BulkExcel } from "../components/BulkExcel";
 import type { LinePage } from "../types/network";
 
 const PAGE_SIZE = 50;
@@ -86,6 +87,8 @@ export default function LineListPage() {
           {loading ? "Loading…" : `${from}–${to} of ${total}`}
         </span>
       </div>
+
+      <BulkExcel kind="lines" canEdit={canEdit} onImported={load} />
 
       {error && <p className="auth-error">{error}</p>}
 

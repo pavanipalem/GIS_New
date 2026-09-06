@@ -94,3 +94,29 @@ the original, so "not commissioned" survives a round trip untouched.
 
 Editing needs the `editor` or `admin` role; viewers get the list and detail
 pages without the edit controls, and the API returns 403 if they try anyway.
+
+
+## Excel import and export
+
+Available on the line list, a line's tower section, solar plants and EHV
+consumers. Three actions each: download a blank template, export the current
+data, import a filled sheet.
+
+**Templates are generated from the current tables**, not copied from the 2019
+workbooks. `backend/app/services/excel_spec.py` holds the column list, and
+`validate_specs()` runs at import time to check every column still names a real
+schema field — so renaming a field breaks the app loudly rather than producing
+a template with a column nothing reads.
+
+Two deliberate differences from the old uploader:
+
+- **Round trips are safe.** A row that keeps its id column updates that record;
+  a blank id adds one. The legacy uploader always inserted, so exporting a
+  sheet, editing it and re-uploading duplicated every row.
+- **All or nothing.** The whole file is applied in one transaction. If any row
+  is rejected you get the row number and the reason, and nothing is written —
+  a bad cell in row 180 cannot leave 179 rows half-applied.
+
+Towers are always scoped to one line, because the sheet does not carry the
+feeder — the same way the old upload took it from whichever line you were
+viewing.

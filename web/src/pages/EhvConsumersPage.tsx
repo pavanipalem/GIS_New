@@ -4,6 +4,7 @@ import { ehvApi } from "../api/assets";
 import { ApiError } from "../api/client";
 import { AppLayout } from "../components/AppLayout";
 import { useAuth } from "../auth/AuthContext";
+import { BulkExcel } from "../components/BulkExcel";
 import type { EhvConsumerFields, EhvConsumerOut } from "../types/assets";
 
 const empty = (): EhvConsumerFields => ({
@@ -117,6 +118,8 @@ export default function EhvConsumersPage() {
           </button>
         )}
       </div>
+
+      <BulkExcel kind="ehv-consumers" canEdit={canEdit} onImported={load} />
 
       {error && <p className="auth-error">{error}</p>}
 
