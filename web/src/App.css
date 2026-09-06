@@ -113,3 +113,20 @@
   flex: 1;
   height: 100%;
 }
+
+/* Shown over the map when a viewport holds more towers than the endpoint
+   will serve. Sits above Leaflet's panes but below its controls. */
+.map-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  pointer-events: none;
+}

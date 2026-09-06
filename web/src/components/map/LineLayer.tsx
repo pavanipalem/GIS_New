@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { CircleMarker, Polyline, Popup, Tooltip } from "react-leaflet";
+import { CircleMarker, Polyline, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { LineFeature, TowerMarker } from "../../types/map";
 import { mapApi } from "../../api/map";
+import { TOWER_ZOOM_THRESHOLD } from "./TowerViewportLayer";
 
 interface LineLayerProps {
   lines: LineFeature[];
@@ -18,6 +19,13 @@ interface LineLayerProps {
  * endpoint would be a reasonable follow-up if per-line inspection isn't
  * enough. */
 export function LineLayer({ lines, color }: LineLayerProps) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  // Above the threshold TowerViewportLayer draws every tower on screen,
+  // so the click-to-inspect towers would be drawn twice. Below it, this is
+  // the only way to see a specific feeder's towers.
+  const showSelectedTowers = zoom < TOWER_ZOOM_THRESHOLD;
   const [selected, setSelected] = useState<number | null>(null);
   const [towers, setTowers] = useState<TowerMarker[]>([]);
   const [loadingTowers, setLoadingTowers] = useState(false);
@@ -69,6 +77,7 @@ export function LineLayer({ lines, color }: LineLayerProps) {
       ))}
 
       {selected !== null &&
+        showSelectedTowers &&
         towers.map((t) => (
           <CircleMarker
             key={t.tower_id}

@@ -65,8 +65,20 @@ export interface TowerMarker {
   seq_no: number | null;
   location_no: string | null;
   tower_type: string | null;
+  // drive the legacy colour rules
+  telecom_joint_box: string | null;
+  additional_info: string | null;
   lat: number;
   lng: number;
+
+  // joined from gis.line, because a viewport query spans many feeders
+  line_volt_class: string | null;
+  line_feeder_name: string | null;
+  line_length_ckm: number | null;
+  line_tower_count: number | null;
+  line_circuit_type: string | null;
+  line_conductor_type: string | null;
+  line_date_of_charging: string | null;
 }
 
 export interface PgcilSubstationMarker {

@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel
 
 
@@ -60,13 +62,36 @@ class LineFeature(BaseModel):
 
 
 class TowerMarker(BaseModel):
+    """Carries everything the legacy tower circle showed.
+
+    arcgisScript.js bound a hover label of LOCATION NO + TYPE OF TOWER, and a
+    click popup that mixed tower fields with line fields (feeder name, length,
+    circuit/conductor type, date of charging). The line fields are joined in
+    here rather than looked up client-side, because the viewport query returns
+    towers spanning many feeders - the caller has no guarantee of holding the
+    matching line.
+    """
+
     tower_id: int
     feeder_id: int | None
     seq_no: int | None
     location_no: str | None
     tower_type: str | None
+    # drives the legacy colour rules: yellow when a joint box is present,
+    # orange when additional_info is "UC"
+    telecom_joint_box: str | None
+    additional_info: str | None
     lat: float
     lng: float
+
+    # joined from gis.line
+    line_volt_class: str | None
+    line_feeder_name: str | None
+    line_length_ckm: float | None
+    line_tower_count: int | None
+    line_circuit_type: str | None
+    line_conductor_type: str | None
+    line_date_of_charging: date | None
 
 
 class PgcilSubstationMarker(BaseModel):

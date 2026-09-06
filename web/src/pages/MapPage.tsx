@@ -7,6 +7,11 @@ import { useLayerData } from "../components/map/useLayerData";
 import { PointLayer } from "../components/map/PointLayer";
 import { SubstationLayerGroup } from "../components/map/SubstationLayerGroup";
 import { LineLayerGroup } from "../components/map/LineLayerGroup";
+import {
+  TowerViewportLayer,
+  TOWER_ZOOM_THRESHOLD,
+} from "../components/map/TowerViewportLayer";
+import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
 
 // Roughly centers and frames the state of Telangana.
 const TELANGANA_CENTER: [number, number] = [17.9, 79.3];
@@ -28,9 +33,15 @@ type LayerKey =
   | "ehv"
   | "pgcil-substations"
   | "pgcil-lines"
-  | "hydel";
+  | "hydel"
+  | "towers";
 
-const DEFAULT_ON: LayerKey[] = ["substations-400", "substations-220", "substations-132"];
+const DEFAULT_ON: LayerKey[] = [
+  "substations-400",
+  "substations-220",
+  "substations-132",
+  "towers",
+];
 
 export default function MapPage() {
   const { user, logout } = useAuth();
@@ -88,6 +99,10 @@ export default function MapPage() {
 
         <fieldset>
           <legend>Other layers</legend>
+          <label title={`Towers appear automatically at zoom ${TOWER_ZOOM_THRESHOLD} and closer`}>
+            <input type="checkbox" checked={on.has("towers")} onChange={() => toggle("towers")} />
+            Towers (on zoom in)
+          </label>
           <label>
             <input type="checkbox" checked={on.has("solar")} onChange={() => toggle("solar")} />
             Solar plants
@@ -124,6 +139,8 @@ export default function MapPage() {
       </aside>
 
       <MapContainer center={TELANGANA_CENTER} zoom={DEFAULT_ZOOM} className="map-container">
+        <InvalidateSizeOnResize />
+
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -146,6 +163,8 @@ export default function MapPage() {
             color={VOLT_COLOR[vc]}
           />
         ))}
+
+        <TowerViewportLayer enabled={on.has("towers")} />
 
         {solar.data && on.has("solar") && (
           <PointLayer

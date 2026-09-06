@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -60,9 +60,32 @@ def towers(
     near_lat: float | None = Query(default=None, ge=-90, le=90),
     near_lng: float | None = Query(default=None, ge=-180, le=180),
     radius_km: float | None = Query(default=None, gt=0, le=100),
+    bbox: str | None = Query(
+        default=None,
+        description="Viewport as west,south,east,north in WGS84 degrees",
+        examples=["78.3,17.2,78.7,17.6"],
+    ),
     db: Session = Depends(get_db),
 ):
-    return map_service.list_towers(db, feeder_id, near_lat, near_lng, radius_km)
+    parsed_bbox: tuple[float, float, float, float] | None = None
+    if bbox is not None:
+        try:
+            west, south, east, north = (float(p) for p in bbox.split(","))
+        except ValueError:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "bbox must be west,south,east,north"
+            ) from None
+        if not (-180 <= west <= 180 and -180 <= east <= 180):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "bbox longitudes out of range")
+        if not (-90 <= south <= 90 and -90 <= north <= 90):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "bbox latitudes out of range")
+        if west >= east or south >= north:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "bbox must be west<east and south<north"
+            )
+        parsed_bbox = (west, south, east, north)
+
+    return map_service.list_towers(db, feeder_id, near_lat, near_lng, radius_km, parsed_bbox)
 
 
 @router.get("/pgcil-substations", response_model=list[PgcilSubstationMarker])

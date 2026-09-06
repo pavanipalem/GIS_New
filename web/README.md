@@ -42,10 +42,26 @@ reference datasets (largest is 1,959 rows), so there is nothing to refetch.
 as a path, so a whole voltage class costs ~900 paths instead of ~105,000
 points. Clicking a line fetches that feeder's towers on demand.
 
-Towers are deliberately never fetched for the whole viewport:
-`/api/map/towers` takes either `feeder_id` or a point + radius, and refuses an
-unfiltered request. If per-line inspection turns out not to be enough, a
-bbox/viewport tower endpoint would be the follow-up — it does not exist yet.
+**Towers appear on zoom, matching the legacy behaviour.** Past zoom 13,
+`TowerViewportLayer` fetches whatever is in the current viewport via
+`/api/map/towers?bbox=`, debounced on pan/zoom, and draws each tower the way
+`arcgisScript.js` did: a 50 metre real-world circle (so they grow as you zoom),
+a hover label of location number + tower type, and a click popup carrying the
+line's feeder name, length, circuit and conductor type alongside the tower's
+own fields.
+
+Colours follow the legacy precedence exactly: yellow `#FFFF00` when the tower
+has a Telecom JointBox, orange `#f58c00` when `ADDITIONAL INFO` is `"UC"`,
+otherwise the line's voltage colour, and grey for a tower whose feeder matches
+no line.
+
+Zoom 13 is the floor because a 50 m circle renders to roughly 1.4 px at z12 and
+is effectively invisible; it is ~2.7 px at z13 and ~5.4 px at z14. The endpoint
+refuses more than 5,000 towers in one scope, so the layer shows a "zoom in
+further" notice rather than failing silently.
+
+Below zoom 13 the viewport layer is off, and clicking a line still loads that
+one feeder's towers — the two never draw at once.
 
 **CircleMarker everywhere, no marker icons.** Sidesteps the Leaflet
 default-icon-path problem under bundlers entirely; colour already carries the

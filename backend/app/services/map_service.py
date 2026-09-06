@@ -122,36 +122,84 @@ def list_lines(db: Session, volt_class: str | None = None) -> list[LineFeature]:
 
 
 # -------------------------------------------------------------------- towers
+# A viewport at the zoom where towers become useful holds a few hundred of
+# them. This cap exists so a request for a whole-state bbox fails loudly
+# instead of quietly serving 100k rows into the browser.
+MAX_TOWERS_PER_REQUEST = 5000
+
+
 def list_towers(
     db: Session,
     feeder_id: int | None = None,
     near_lat: float | None = None,
     near_lng: float | None = None,
     radius_km: float | None = None,
+    bbox: tuple[float, float, float, float] | None = None,
 ) -> list[TowerMarker]:
-    """Towers are never returned unfiltered - 105k rows would flood the map
-    and every legacy caller (per-feeder view, radius search) scoped the
-    query the same way. Require one of the two filters."""
-    if feeder_id is None and (near_lat is None or near_lng is None or radius_km is None):
+    """Towers are never returned unfiltered - 105k rows would flood the map.
+    Exactly one of three scopes: a feeder, a point + radius, or a viewport
+    bbox (west, south, east, north).
+    """
+    scopes = [feeder_id is not None, radius_km is not None, bbox is not None]
+    if sum(scopes) != 1:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Provide feeder_id, or near_lat + near_lng + radius_km",
+            "Provide exactly one of: feeder_id, near_lat+near_lng+radius_km, or bbox",
+        )
+    if radius_km is not None and (near_lat is None or near_lng is None):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "radius_km requires near_lat and near_lng"
         )
 
-    stmt = select(
-        Tower.tower_id, Tower.feeder_id, Tower.seq_no, Tower.location_no, Tower.tower_type,
-        _lat(Tower.location), _lng(Tower.location),
-    ).where(Tower.location.isnot(None))
+    stmt = (
+        select(
+            Tower.tower_id,
+            Tower.feeder_id,
+            Tower.seq_no,
+            Tower.location_no,
+            Tower.tower_type,
+            Tower.telecom_joint_box,
+            Tower.additional_info,
+            _lat(Tower.location),
+            _lng(Tower.location),
+            Line.volt_class.label("line_volt_class"),
+            Line.feeder_name.label("line_feeder_name"),
+            Line.length_ckm.label("line_length_ckm"),
+            Line.tower_count.label("line_tower_count"),
+            Line.circuit_type.label("line_circuit_type"),
+            Line.conductor_type.label("line_conductor_type"),
+            Line.date_of_charging.label("line_date_of_charging"),
+        )
+        # outer join: an orphan tower (feeder_id pointing at no line) still
+        # renders, just without line context
+        .outerjoin(Line, Tower.feeder_id == Line.feeder_id)
+        .where(Tower.location.isnot(None))
+    )
 
     if feeder_id is not None:
         stmt = stmt.where(Tower.feeder_id == feeder_id).order_by(Tower.seq_no)
-    else:
+    elif radius_km is not None:
         point = func.ST_SetSRID(func.ST_MakePoint(near_lng, near_lat), 4326)
         stmt = stmt.where(
             func.ST_DWithin(Tower.location, cast(point, Geography), radius_km * 1000)
+        ).limit(MAX_TOWERS_PER_REQUEST + 1)
+    else:
+        west, south, east, north = bbox  # type: ignore[misc]
+        envelope = func.ST_MakeEnvelope(west, south, east, north, 4326)
+        stmt = (
+            stmt.where(func.ST_Intersects(Tower.location, cast(envelope, Geography)))
+            # seq_no order keeps a feeder's towers contiguous for the client
+            .order_by(Tower.feeder_id, Tower.seq_no)
+            .limit(MAX_TOWERS_PER_REQUEST + 1)
         )
 
-    return [TowerMarker(**row._mapping) for row in db.execute(stmt)]
+    rows = [TowerMarker(**row._mapping) for row in db.execute(stmt)]
+    if len(rows) > MAX_TOWERS_PER_REQUEST:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"More than {MAX_TOWERS_PER_REQUEST} towers in scope - zoom in further",
+        )
+    return rows
 
 
 # --------------------------------------------------------- reference layers
