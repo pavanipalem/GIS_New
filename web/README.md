@@ -65,6 +65,19 @@ further" notice rather than failing silently.
 Below zoom 13 the viewport layer is off, and clicking a line still loads that
 one feeder's towers — the two never draw at once.
 
+**District boundaries.** The 33 post-reorganisation Telangana districts are
+shaded from `public/telangana-districts.json`, copied from the legacy
+`Content/TelanganaDistricts.json`. Fill colours are extracted from
+`arcgisScript.js` into `districtColours.ts` so the map keeps the shading users
+know — all 33 names match the GeoJSON exactly, checked rather than assumed.
+
+The legacy style object itself was not copied: it set `Color` (capital C),
+`fillopacity` (lowercase o) and `opacity: 3`, none of which Leaflet reads, so
+the districts never rendered the way that code intended. The layer takes the
+intent instead — the district fill at 0.45 opacity with a thin dark border —
+and sits in its own pane at z-index 350, below Leaflet's overlay pane, so
+substations, routes and towers always draw on top.
+
 **CircleMarker everywhere, no marker icons.** Sidesteps the Leaflet
 default-icon-path problem under bundlers entirely; colour already carries the
 per-layer meaning.

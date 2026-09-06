@@ -12,6 +12,7 @@ import {
   TOWER_ZOOM_THRESHOLD,
 } from "../components/map/TowerViewportLayer";
 import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
+import { DistrictsLayer } from "../components/map/DistrictsLayer";
 
 // Roughly centers and frames the state of Telangana.
 const TELANGANA_CENTER: [number, number] = [17.9, 79.3];
@@ -34,13 +35,15 @@ type LayerKey =
   | "pgcil-substations"
   | "pgcil-lines"
   | "hydel"
-  | "towers";
+  | "towers"
+  | "districts";
 
 const DEFAULT_ON: LayerKey[] = [
   "substations-400",
   "substations-220",
   "substations-132",
   "towers",
+  "districts",
 ];
 
 export default function MapPage() {
@@ -64,6 +67,18 @@ export default function MapPage() {
     <AppLayout fullBleed>
     <div className="map-page">
       <aside className="layer-panel">
+        <fieldset>
+          <legend>Base</legend>
+          <label>
+            <input
+              type="checkbox"
+              checked={on.has("districts")}
+              onChange={() => toggle("districts")}
+            />
+            District boundaries
+          </label>
+        </fieldset>
+
         <fieldset>
           <legend>Substations</legend>
           {VOLT_CLASSES.map((vc) => (
@@ -137,6 +152,8 @@ export default function MapPage() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        <DistrictsLayer enabled={on.has("districts")} />
 
         {VOLT_CLASSES.map((vc) => (
           <SubstationLayerGroup

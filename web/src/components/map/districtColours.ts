@@ -1,0 +1,40 @@
+// Fill colours lifted from arcgisScript.js so the map keeps the
+// district shading users already know. Keys must match
+// TelanganaDistricts.json properties.name exactly.
+export const DISTRICT_COLOURS: Record<string, string> = {
+  "Adilabad": "#FBCFA3",
+  "Bhadradri Kothagudem": "#EBE96E",
+  "Hyderabad": "#5DBCD2",
+  "Jagtial": "#BAD7AF",
+  "Jangaon": "#F5F9AB",
+  "Jayashankar Bhupalapally": "#C0D5B2",
+  "Jogulamba Gadwal": "#4D4961",
+  "Kamareddy": "#EED5A8",
+  "Karimnagar": "#F6BDD3",
+  "Khammam": "#ECC2D3",
+  "Komram Bheem": "#AC635D",
+  "Mahabubabad": "#6F6D23",
+  "Mahabubnagar": "#B2CFAA",
+  "Mancherial District": "#E5EDC5",
+  "Medak": "#C7C8AB",
+  "Medchal\u2013Malkajgiri": "#A5A2B7",
+  "Mulugu": "#BDD76C",
+  "Nagarkurnool": "#7A6247",
+  "Nalgonda": "#DBD6ED",
+  "Narayanpet": "#8A8644",
+  "Nirmal": "#6F6D23",
+  "Nizamabad": "#D4B0BE",
+  "Peddapalli": "#F4F5A5",
+  "Rajanna Sircilla": "#9AAB66",
+  "Rangareddy": "#F0F6B0",
+  "Sangareddy": "#8F6E44",
+  "Siddipet": "#C1ADB9",
+  "Suryapet": "#DBE7CF",
+  "Vikarabad": "#BBAFDF",
+  "Wanaparthy": "#BAABB7",
+  "Warangal Rural": "#CAC7D8",
+  "Warangal Urban": "#9390A3",
+  "Yadadri Bhuvanagiri": "#9F848D",
+};
+
+export const DISTRICT_FALLBACK = "#DDDDDD";
