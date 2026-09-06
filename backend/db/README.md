@@ -12,6 +12,8 @@ Run them in order.
 | `102_backfill_solar_ehv_pgcil_hydel.sql` | Loads `Solar Plants`, `ehvconsumers`, `pgcil`, `hydelpowerstations`, `pgcillines`. Needs `100` to have run. Re-runnable. |
 | `004_widen_text_columns.sql` | Sizes the line/tower text columns from measured data. Stamps `'0004'`. |
 | `005_add_solar_ehv_pgcil_hydel.sql` | Adds `gis.solar_plant`, `gis.ehv_consumer`, and three read-only reference tables. Stamps `'0005'`. |
+| `006_add_id_sequences.sql` | Sequences for `line.feeder_id` and `tower.tower_id` (IDENTITY in SQL Server). Stamps `'0006'`. |
+| `007_line_date_raw.sql` | Adds and backfills `line.date_of_charging_raw` / `last_maintenance_date_raw`, recovering text the first line backfill discarded. Stamps `'0007'`. |
 | `100_backfill_substations.sql` | Loads `legacy_raw."substations-template"` into `gis.substation` / `transformer` / `substation_equipment`. Re-runnable. |
 | `001_initial_core_rollback.sql` | Drops everything `001` created. |
 
@@ -23,6 +25,8 @@ psql -h 172.17.4.194 -U postgres -d gisdata -f 001_initial_core.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 002_add_yoc_year.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 003_add_line_tower.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 004_widen_text_columns.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 006_add_id_sequences.sql
+psql -h 172.17.4.194 -U postgres -d gisdata -f 007_line_date_raw.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 100_backfill_substations.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 005_add_solar_ehv_pgcil_hydel.sql
 psql -h 172.17.4.194 -U postgres -d gisdata -f 101_backfill_lines_towers.sql

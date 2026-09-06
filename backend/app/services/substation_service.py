@@ -124,8 +124,11 @@ def _apply_children(
 
 
 def _apply_scalars(substation: Substation, data: SubstationCreate | SubstationUpdate) -> None:
+    # exclude_unset so an edit that omits a field leaves it alone instead of
+    # nulling it; the form sends everything, but an API client need not.
     fields = data.model_dump(
-        exclude={"ss_code", "location", "boundary", "transformers", "equipment"}
+        exclude={"ss_code", "location", "boundary", "transformers", "equipment"},
+        exclude_unset=True,
     )
     for name, value in fields.items():
         if name == "volt_class":

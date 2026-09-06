@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Date, DateTime, Index, Integer, Numeric, String, Text
+from sqlalchemy import Date, DateTime, Index, Integer, Numeric, Sequence, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -28,7 +28,11 @@ class Line(Base):
         Index("ix_line_zone_circle", "zone", "circle"),
     )
 
-    feeder_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    # IDENTITY in SQL Server; a sequence here (migration 0006) so new lines
+    # get an id allocated instead of the caller inventing one.
+    feeder_id: Mapped[int] = mapped_column(
+        Integer, Sequence("line_feeder_id_seq", schema="gis"), primary_key=True
+    )
 
     feeder_name: Mapped[str | None] = mapped_column(Text)
     volt_class: Mapped[str | None] = mapped_column(String(50))
@@ -44,8 +48,22 @@ class Line(Base):
     conductor_type: Mapped[str | None] = mapped_column(Text)
     earth_wire_type: Mapped[str | None] = mapped_column(Text)
 
+    # Parsed where possible; the *_raw columns always hold what was actually
+    # entered. 31% of charging dates and 40% of maintenance dates carry more
+    # than one date can express - per-circuit, per-section, or a qualifier -
+    # so parsing alone would discard real information.
     date_of_charging: Mapped[date | None] = mapped_column(Date)
+    date_of_charging_raw: Mapped[str | None] = mapped_column(
+        Text,
+        comment=(
+            "Original DATE_OF_CHRGING_OF_LINE text. date_of_charging holds the "
+            "parsed value when there is one; this always holds what was entered."
+        ),
+    )
     last_maintenance_date: Mapped[date | None] = mapped_column(Date)
+    last_maintenance_date_raw: Mapped[str | None] = mapped_column(
+        Text, comment="Original LAST_MAINTENANCE_DATE text, as above."
+    )
 
     jurisdiction: Mapped[str | None] = mapped_column(Text)
     zone: Mapped[str | None] = mapped_column(String(100))

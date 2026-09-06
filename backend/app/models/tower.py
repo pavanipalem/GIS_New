@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Sequence,
     SmallInteger,
     String,
     Text,
@@ -41,7 +42,10 @@ class Tower(Base):
         Index("ix_tower_feeder_seq", "feeder_id", "seq_no"),
     )
 
-    tower_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    # IDENTITY in SQL Server; a sequence here (migration 0006).
+    tower_id: Mapped[int] = mapped_column(
+        BigInteger, Sequence("tower_tower_id_seq", schema="gis"), primary_key=True
+    )
     feeder_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("line.feeder_id", ondelete="SET NULL")
     )
