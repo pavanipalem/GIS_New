@@ -13,6 +13,14 @@ export interface SubstationMarker {
   volt_class: string | null;
   no_of_ptrs: number | null;
   ss_doc: string | null;
+  primary_mva_cap: number | null;
+  district: string | null;
+  zone: string | null;
+  circle: string | null;
+  division: string | null;
+  /** Filenames only - joined to VITE_DOCUMENT_BASE_URL by the client. */
+  link_sld: string | null;
+  link_ss_photo: string | null;
   lat: number;
   lng: number;
 }

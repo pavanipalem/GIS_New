@@ -49,6 +49,9 @@ def list_substations(db: Session, volt_class: str | None = None) -> list[Substat
         select(
             Substation.ss_code, Substation.ss_name, Substation.ss_type,
             Substation.volt_class, Substation.no_of_ptrs, Substation.ss_doc,
+            Substation.primary_mva_cap, Substation.district, Substation.zone,
+            Substation.circle, Substation.division,
+            Substation.link_sld, Substation.link_ss_photo,
             _lat(Substation.location), _lng(Substation.location),
         )
         .where(Substation.location.isnot(None))

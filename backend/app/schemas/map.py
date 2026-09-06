@@ -9,12 +9,28 @@ class MapPoint(BaseModel):
 
 
 class SubstationMarker(BaseModel):
+    """Everything the legacy marker popup showed.
+
+    arcgisScript.js bound a hover label of just the substation name, and a
+    click popup carrying name, date of commissioning, type, PTR count, MVA
+    capacity, coordinates, the administrative hierarchy, a photo, and a "View"
+    link to the single line diagram.
+    """
+
     ss_code: int
     ss_name: str | None
     ss_type: str | None
     volt_class: str | None
     no_of_ptrs: int | None
     ss_doc: str | None
+    primary_mva_cap: float | None
+    district: str | None
+    zone: str | None
+    circle: str | None
+    division: str | None
+    # filenames only; the client joins them to the configured document base URL
+    link_sld: str | None
+    link_ss_photo: str | None
     lat: float
     lng: float
 

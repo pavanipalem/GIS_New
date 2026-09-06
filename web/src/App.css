@@ -500,3 +500,59 @@ textarea {
 .bulk-errors li {
   font-size: 0.85rem;
 }
+
+/* ------------------------------------------------- substation map popup */
+.ss-popup {
+  min-width: 240px;
+}
+
+.ss-popup-title {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.ss-popup-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1px 0;
+  font-size: 0.82rem;
+}
+
+.ss-popup-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ss-popup-photo {
+  display: block;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.ss-popup-photo img {
+  width: 100%;
+  max-height: 130px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.ss-popup-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.ss-popup-muted {
+  color: var(--text-muted);
+}
+
+/* Leaflet's popup wrapper is narrow by default */
+.leaflet-popup-content {
+  margin: 0.7rem 0.85rem;
+}

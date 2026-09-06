@@ -65,6 +65,20 @@ further" notice rather than failing silently.
 Below zoom 13 the viewport layer is off, and clicking a line still loads that
 one feeder's towers — the two never draw at once.
 
+**Substation popups and documents.** Hovering a substation shows its name;
+clicking opens the legacy field set - date of commissioning, type, PTR count,
+MVA capacity, coordinates, district/zone/circle/division - plus the site photo,
+a **View SLD** link, and **More**, which goes to the substation detail page
+(replacing `MapSubstationMore.aspx`).
+
+The database stores only filenames (`2513link_sld.pdf`); the old IIS site
+served them from `Upload/links/`. Set `VITE_DOCUMENT_BASE_URL` to wherever
+those files now live. **Those files are not in this repo** - the legacy
+project copy has no `Upload/` folder, so they are still on the old server.
+Until that URL points somewhere real the links will 404 and the photo hides
+itself rather than showing a broken image. 385 of 408 substations have an SLD
+on record, 376 have a photo.
+
 **District boundaries.** The 33 post-reorganisation Telangana districts are
 shaded from `public/telangana-districts.json`, copied from the legacy
 `Content/TelanganaDistricts.json`. Fill colours are extracted from
