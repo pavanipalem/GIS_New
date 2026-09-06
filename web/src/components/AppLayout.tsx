@@ -21,6 +21,7 @@ export function AppLayout({
         <nav className="app-nav">
           <NavLink to="/map">Map</NavLink>
           <NavLink to="/substations">Substations</NavLink>
+          <NavLink to="/lines">Lines</NavLink>
         </nav>
         <span className="app-user">
           {user?.username} ({user?.role})

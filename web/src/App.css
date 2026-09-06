@@ -426,3 +426,13 @@
   font-size: 0.82rem;
   color: var(--text-muted);
 }
+
+textarea {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  resize: vertical;
+}

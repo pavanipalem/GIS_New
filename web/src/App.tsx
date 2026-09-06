@@ -6,6 +6,10 @@ import MapPage from "./pages/MapPage";
 import SubstationListPage from "./pages/SubstationListPage";
 import SubstationDetailPage from "./pages/SubstationDetailPage";
 import SubstationEditPage from "./pages/SubstationEditPage";
+import LineListPage from "./pages/LineListPage";
+import LineDetailPage from "./pages/LineDetailPage";
+import LineEditPage from "./pages/LineEditPage";
+import TowerEditPage from "./pages/TowerEditPage";
 import "./App.css";
 
 export default function App() {
@@ -53,6 +57,56 @@ export default function App() {
         element={
           <RequireAuth roles={["admin", "editor"]}>
             <SubstationEditPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/lines"
+        element={
+          <RequireAuth>
+            <LineListPage />
+          </RequireAuth>
+        }
+      />
+      {/* /new before /:feederId so it is not swallowed by the param route */}
+      <Route
+        path="/lines/new"
+        element={
+          <RequireAuth roles={["admin", "editor"]}>
+            <LineEditPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/lines/:feederId"
+        element={
+          <RequireAuth>
+            <LineDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/lines/:feederId/edit"
+        element={
+          <RequireAuth roles={["admin", "editor"]}>
+            <LineEditPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/lines/:feederId/towers/new"
+        element={
+          <RequireAuth roles={["admin", "editor"]}>
+            <TowerEditPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/towers/:towerId/edit"
+        element={
+          <RequireAuth roles={["admin", "editor"]}>
+            <TowerEditPage />
           </RequireAuth>
         }
       />
