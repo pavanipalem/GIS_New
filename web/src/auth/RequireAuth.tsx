@@ -15,7 +15,7 @@ export function RequireAuth({
   if (loading) return <div className="page-loading">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (user.must_change_password) return <Navigate to="/change-password" replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/map" replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }

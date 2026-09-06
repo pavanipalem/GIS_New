@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 from geoalchemy2 import Geography
-from sqlalchemy import BigInteger, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import (
+    BigInteger,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    Sequence,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -17,7 +26,10 @@ class EhvConsumer(Base):
         Index("ix_ehv_consumer_feeder_id", "feeder_id"),
     )
 
-    ehv_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    # IDENTITY in SQL Server; sequence added in migration 0008
+    ehv_id: Mapped[int] = mapped_column(
+        BigInteger, Sequence("ehv_consumer_ehv_id_seq", schema="gis"), primary_key=True
+    )
 
     name: Mapped[str | None] = mapped_column(Text)
     location_desc: Mapped[str | None] = mapped_column(Text)

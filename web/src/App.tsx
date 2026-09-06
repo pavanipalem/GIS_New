@@ -10,6 +10,10 @@ import LineListPage from "./pages/LineListPage";
 import LineDetailPage from "./pages/LineDetailPage";
 import LineEditPage from "./pages/LineEditPage";
 import TowerEditPage from "./pages/TowerEditPage";
+import SolarPlantsPage from "./pages/SolarPlantsPage";
+import EhvConsumersPage from "./pages/EhvConsumersPage";
+import UsersPage from "./pages/UsersPage";
+import HomePage from "./pages/HomePage";
 import "./App.css";
 
 export default function App() {
@@ -111,7 +115,40 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/map" replace />} />
+      <Route
+        path="/solar-plants"
+        element={
+          <RequireAuth>
+            <SolarPlantsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/ehv-consumers"
+        element={
+          <RequireAuth>
+            <EhvConsumersPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <RequireAuth roles={["admin"]}>
+            <UsersPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <HomePage />
+          </RequireAuth>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

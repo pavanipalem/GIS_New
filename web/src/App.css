@@ -436,3 +436,42 @@ textarea {
   background: var(--surface);
   resize: vertical;
 }
+
+.notice {
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  background: #eef6ff;
+  border: 1px solid #b8d8f5;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 90px;
+}
+
+.metric-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+
+.home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

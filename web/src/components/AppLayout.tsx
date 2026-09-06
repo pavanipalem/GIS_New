@@ -19,9 +19,15 @@ export function AppLayout({
       <header className="app-header">
         <span className="app-brand">TGTransco GIS</span>
         <nav className="app-nav">
+          <NavLink to="/" end>
+            Home
+          </NavLink>
           <NavLink to="/map">Map</NavLink>
           <NavLink to="/substations">Substations</NavLink>
           <NavLink to="/lines">Lines</NavLink>
+          <NavLink to="/solar-plants">Solar</NavLink>
+          <NavLink to="/ehv-consumers">EHV</NavLink>
+          {user?.role === "admin" && <NavLink to="/users">Users</NavLink>}
         </nav>
         <span className="app-user">
           {user?.username} ({user?.role})

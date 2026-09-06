@@ -17,7 +17,7 @@ export default function ChangePasswordPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && !user) return <Navigate to="/login" replace />;
-  if (!loading && user && !user.must_change_password) return <Navigate to="/map" replace />;
+  if (!loading && user && !user.must_change_password) return <Navigate to="/" replace />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
