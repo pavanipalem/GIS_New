@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { useAuth } from "../auth/AuthContext";
+import { AppLayout } from "../components/AppLayout";
 import { mapApi } from "../api/map";
 import { useLayerData } from "../components/map/useLayerData";
 import { PointLayer } from "../components/map/PointLayer";
@@ -44,7 +44,6 @@ const DEFAULT_ON: LayerKey[] = [
 ];
 
 export default function MapPage() {
-  const { user, logout } = useAuth();
   const [on, setOn] = useState<Set<LayerKey>>(new Set(DEFAULT_ON));
 
   const toggle = (key: LayerKey) =>
@@ -62,13 +61,9 @@ export default function MapPage() {
   const hydel = useLayerData(on.has("hydel"), mapApi.hydelPowerStations);
 
   return (
+    <AppLayout fullBleed>
     <div className="map-page">
       <aside className="layer-panel">
-        <h2>TGTransco GIS</h2>
-        <p className="layer-panel-user">
-          {user?.username} ({user?.role})
-        </p>
-
         <fieldset>
           <legend>Substations</legend>
           {VOLT_CLASSES.map((vc) => (
@@ -133,9 +128,6 @@ export default function MapPage() {
           </label>
         </fieldset>
 
-        <button type="button" onClick={logout} className="link-button">
-          Sign out
-        </button>
       </aside>
 
       <MapContainer center={TELANGANA_CENTER} zoom={DEFAULT_ZOOM} className="map-container">
@@ -259,5 +251,6 @@ export default function MapPage() {
         )}
       </MapContainer>
     </div>
+    </AppLayout>
   );
 }

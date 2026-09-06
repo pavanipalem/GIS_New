@@ -23,12 +23,14 @@ backend's `CORS_ORIGINS`.
 src/
   api/        client (JWT + refresh-on-401), auth, map, users
   auth/       AuthContext, RequireAuth route guard
+  components/AppLayout.tsx   top bar + nav shell
   components/map/
               PointLayer          shared CircleMarker renderer
               LineLayer           polylines + click-to-load towers
               SubstationLayerGroup / LineLayerGroup   one per voltage class
               useLayerData        lazy fetch-once-per-layer hook
-  pages/      LoginPage, ChangePasswordPage, MapPage
+  pages/      LoginPage, ChangePasswordPage, MapPage,
+              SubstationListPage / DetailPage / EditPage
   types/      mirrors the backend Pydantic schemas field-for-field
 ```
 
@@ -72,3 +74,23 @@ passwords were never migrated, so `import-legacy-users` gives them an unusable
 hash. An admin issues a temp password via `POST /api/users/{id}/reset-password`,
 the user signs in with it, and `RequireAuth` forces them through
 `/change-password` before anything else.
+
+
+## Substation pages
+
+List (paged, searchable by name/code/district, filterable by voltage), detail,
+and an edit form that mirrors the legacy `SubstationData.aspx` layout: nine
+fixed transformer slots, an equipment table for the shunt reactor / capacitor
+/ station transformer, and fifteen boundary point pairs.
+
+The boundary points are behind a collapsed section, because nothing on the map
+draws substation boundaries - they are kept only because the legacy form
+captured them. Leaving latitude/longitude blank falls back to boundary point 1
+as the marker position, which is what the old stored procedure did.
+
+Year of commissioning is a free-text field, exactly as the legacy form had it.
+The server parses what it can into a real date and a year, and always keeps
+the original, so "not commissioned" survives a round trip untouched.
+
+Editing needs the `editor` or `admin` role; viewers get the list and detail
+pages without the edit controls, and the API returns 403 if they try anyway.
