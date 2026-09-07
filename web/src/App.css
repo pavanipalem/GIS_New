@@ -55,10 +55,10 @@
   height: 100%;
 }
 
-/* The panel hides so the map can use the full width. `hidden` alone is not
-   enough - the panel's own display:flex would beat the attribute's UA rule -
-   and Leaflet is told nothing here: InvalidateSizeOnResize already watches
-   the map container, so the resize corrects itself. */
+/* The panel hides so the map can use the full width. Explicit rather than
+   relying on the [hidden] UA default, which a later display rule could
+   override. Leaflet is told nothing here: InvalidateSizeOnResize already
+   watches the map container, so the resize corrects itself. */
 .layer-panel[hidden] {
   display: none;
 }
@@ -122,15 +122,21 @@
   margin-top: 40px;
 }
 
+/* A plain vertical scroll container - not a flex column. A flex column
+   shrinks its children to fit the viewport, which (with the groups'
+   overflow:hidden) clipped their contents instead of scrolling. The panel
+   is as tall as its content and scrolls when that is taller than the
+   screen. */
 .layer-panel {
   flex: 0 0 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
   padding: 1.25rem;
   overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--border);
+}
+
+.layer-panel > * + * {
+  margin-top: 0.9rem;
 }
 
 .layer-panel h2 {
@@ -144,7 +150,10 @@
   color: var(--text-muted);
 }
 
-/* A collapsible panel section: a header button that folds the body away. */
+/* A collapsible panel section: a header button that folds the body away.
+   overflow:hidden is only for the rounded-corner clip - safe now that the
+   panel is a block scroll container, so the section is always its natural
+   height and never squeezed. */
 .panel-group {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -158,11 +167,11 @@
   width: 100%;
   padding: 0.5rem 0.6rem;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-align: left;
   background: var(--bg);
   border: none;
