@@ -35,16 +35,25 @@ function towerColour(t: TowerMarker): string {
 
 /** Auto-loads and draws towers for whatever is on screen, once zoomed in
  * past TOWER_ZOOM_THRESHOLD. Refetches on pan/zoom, debounced, and drops
- * responses that arrive after a newer request has already been issued. */
-export function TowerViewportLayer({ enabled }: { enabled: boolean }) {
+ * responses that arrive after a newer request has already been issued.
+ *
+ * `voltClasses` is the set of transmission-line layers that are switched on.
+ * Towers follow their line: with 220 selected and 132 not, zooming in shows
+ * the 220 kV towers along the 220 kV corridors and nothing else. An empty
+ * set means no line layer is on, so no towers are drawn or fetched. */
+export function TowerViewportLayer({ voltClasses }: { voltClasses: string[] }) {
   const map = useMap();
   const [towers, setTowers] = useState<TowerMarker[]>([]);
   const [tooMany, setTooMany] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
 
+  // a stable primitive for the effect dep, so [220,132] and [132,220] and a
+  // fresh array with the same contents do not each trigger a refetch
+  const voltKey = [...voltClasses].sort().join(",");
+
   const refresh = useCallback(() => {
-    if (!enabled || map.getZoom() < TOWER_ZOOM_THRESHOLD) {
+    if (!voltKey || map.getZoom() < TOWER_ZOOM_THRESHOLD) {
       setTowers([]);
       setTooMany(false);
       return;
@@ -52,7 +61,13 @@ export function TowerViewportLayer({ enabled }: { enabled: boolean }) {
     const b = map.getBounds();
     const seq = ++requestSeq.current;
     mapApi
-      .towersInBbox(b.getWest(), b.getSouth(), b.getEast(), b.getNorth())
+      .towersInBbox(
+        b.getWest(),
+        b.getSouth(),
+        b.getEast(),
+        b.getNorth(),
+        voltKey.split(",")
+      )
       .then((data) => {
         if (seq !== requestSeq.current) return; // a newer request superseded this
         setTowers(data);
@@ -64,7 +79,7 @@ export function TowerViewportLayer({ enabled }: { enabled: boolean }) {
         // 400 here means the viewport holds more than the endpoint will serve
         setTooMany(err instanceof ApiError && err.status === 400);
       });
-  }, [enabled, map]);
+  }, [voltKey, map]);
 
   const scheduleRefresh = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -80,7 +95,7 @@ export function TowerViewportLayer({ enabled }: { enabled: boolean }) {
     };
   }, [refresh]);
 
-  if (!enabled) return null;
+  if (!voltKey) return null;
 
   return (
     <>

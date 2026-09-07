@@ -43,10 +43,22 @@ export const mapApi = {
     get<TowerMarker[]>(
       `/map/towers${qs({ near_lat: lat, near_lng: lng, radius_km: radiusKm })}`
     ),
-  /** west,south,east,north in WGS84 degrees. Rejects with 400 above 5,000
-   * towers, so only call it once zoomed in far enough. */
-  towersInBbox: (west: number, south: number, east: number, north: number) =>
-    get<TowerMarker[]>(`/map/towers${qs({ bbox: `${west},${south},${east},${north}` })}`),
+  /** west,south,east,north in WGS84 degrees. `voltClasses` restricts the
+   * result to towers on lines of those classes - the map passes the line
+   * layers that are switched on, so towers for an unselected voltage never
+   * come down. Rejects with 400 above 5,000 towers, so only call it once
+   * zoomed in far enough. */
+  towersInBbox: (
+    west: number,
+    south: number,
+    east: number,
+    north: number,
+    voltClasses: string[] = []
+  ) => {
+    const params = new URLSearchParams({ bbox: `${west},${south},${east},${north}` });
+    for (const vc of voltClasses) params.append("volt_class", vc);
+    return get<TowerMarker[]>(`/map/towers?${params.toString()}`);
+  },
   pgcilSubstations: () => get<PgcilSubstationMarker[]>("/map/pgcil-substations"),
   hydelPowerStations: () => get<HydelPowerStationMarker[]>("/map/hydel-power-stations"),
   pgcilLines: () => get<PgcilLineMarker[]>("/map/pgcil-lines"),

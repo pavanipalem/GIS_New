@@ -8,10 +8,7 @@ import { IconMarkerLayer } from "../components/map/IconMarkerLayer";
 import { PointLayer } from "../components/map/PointLayer";
 import { SubstationLayerGroup } from "../components/map/SubstationLayerGroup";
 import { LineLayerGroup } from "../components/map/LineLayerGroup";
-import {
-  TowerViewportLayer,
-  TOWER_ZOOM_THRESHOLD,
-} from "../components/map/TowerViewportLayer";
+import { TowerViewportLayer } from "../components/map/TowerViewportLayer";
 import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
 import { ClampNorth } from "../components/map/ClampNorth";
 import {
@@ -51,10 +48,9 @@ type LayerKey =
   | "hydel"
   | "thermal"
   | "solar"
-  | "ehv"
-  | "towers";
+  | "ehv";
 
-const DEFAULT_ON: LayerKey[] = ["ss-400", "ss-220", "ss-132", "towers"];
+const DEFAULT_ON: LayerKey[] = ["ss-400", "ss-220", "ss-132"];
 
 /** Whether the layer panel is open is remembered per browser: someone who
  * works mostly at full-map width should not have to collapse it on every
@@ -181,6 +177,12 @@ export default function MapPage() {
   const transcoTotal = total(counts?.substations_transco);
   const lisWwTotal = total(counts?.substations_lis_ww);
   const linesTotal = total(counts?.lines);
+
+  // Towers follow the transmission-line layers: a class's towers are drawn on
+  // zoom-in only while that class's line layer is on. Nothing to select
+  // separately - the old standalone "Towers" toggle showed every class at
+  // once regardless of what lines were on.
+  const enabledLineVoltClasses = VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`));
 
   // A voltage class's lines are filtered only while that same class is the one
   // chosen in the From/To search; the other classes keep showing everything.
@@ -433,16 +435,6 @@ export default function MapPage() {
             />
           </fieldset>
 
-          <fieldset>
-            <legend>Towers</legend>
-            <LayerRow
-              checked={on.has("towers")}
-              onChange={() => toggle("towers")}
-              label="Towers"
-              title={`Drawn automatically at zoom ${TOWER_ZOOM_THRESHOLD} and closer`}
-            />
-            <div className="layer-total">Shown from zoom {TOWER_ZOOM_THRESHOLD}</div>
-          </fieldset>
         </aside>
 
         <MapContainer
@@ -504,7 +496,7 @@ export default function MapPage() {
             underground
           />
 
-          <TowerViewportLayer enabled={on.has("towers")} />
+          <TowerViewportLayer voltClasses={enabledLineVoltClasses} />
 
           {pgcilSs.data && on.has("pgcil-ss") && (
             <IconMarkerLayer

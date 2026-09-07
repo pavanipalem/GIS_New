@@ -164,10 +164,17 @@ def list_towers(
     near_lng: float | None = None,
     radius_km: float | None = None,
     bbox: tuple[float, float, float, float] | None = None,
+    volt_classes: list[str] | None = None,
 ) -> list[TowerMarker]:
     """Towers are never returned unfiltered - 105k rows would flood the map.
     Exactly one of three scopes: a feeder, a point + radius, or a viewport
     bbox (west, south, east, north).
+
+    volt_classes, when given, restricts the result to towers whose line is one
+    of those classes. The map uses it so a zoomed-in viewport only shows towers
+    for the transmission-line layers that are actually switched on - an orphan
+    tower, or one whose line is a different voltage, is left out rather than
+    drawn in a colour for a layer the user did not select.
     """
     scopes = [feeder_id is not None, radius_km is not None, bbox is not None]
     if sum(scopes) != 1:
@@ -215,11 +222,14 @@ def list_towers(
     else:
         west, south, east, north = bbox  # type: ignore[misc]
         envelope = func.ST_MakeEnvelope(west, south, east, north, 4326)
+        stmt = stmt.where(
+            func.ST_Intersects(Tower.location, cast(envelope, Geography))
+        )
+        if volt_classes:
+            stmt = stmt.where(Line.volt_class.in_(volt_classes))
         stmt = (
-            stmt.where(func.ST_Intersects(Tower.location, cast(envelope, Geography)))
             # seq_no order keeps a feeder's towers contiguous for the client
-            .order_by(Tower.feeder_id, Tower.seq_no)
-            .limit(MAX_TOWERS_PER_REQUEST + 1)
+            stmt.order_by(Tower.feeder_id, Tower.seq_no).limit(MAX_TOWERS_PER_REQUEST + 1)
         )
 
     rows = [TowerMarker(**row._mapping) for row in db.execute(stmt)]

@@ -100,6 +100,11 @@ def towers(
         description="Viewport as west,south,east,north in WGS84 degrees",
         examples=["78.3,17.2,78.7,17.6"],
     ),
+    volt_class: list[str] | None = Query(
+        default=None,
+        description="Restrict to towers on lines of these voltage classes "
+        "(repeatable). Only meaningful with bbox.",
+    ),
     db: Session = Depends(get_db),
 ):
     parsed_bbox: tuple[float, float, float, float] | None = None
@@ -120,7 +125,9 @@ def towers(
             )
         parsed_bbox = (west, south, east, north)
 
-    return map_service.list_towers(db, feeder_id, near_lat, near_lng, radius_km, parsed_bbox)
+    return map_service.list_towers(
+        db, feeder_id, near_lat, near_lng, radius_km, parsed_bbox, volt_class
+    )
 
 
 @router.get("/pgcil-substations", response_model=list[PgcilSubstationMarker])
