@@ -63,15 +63,13 @@ class LayerCounts(BaseModel):
 class SubstationEndpoints(BaseModel):
     """Values for the map's From / To line filter - GetMapData flag 2.
 
-    from_substations / to_substations are the distinct ends. pairs is every
-    real (from, to) combination that an actual line has, so the To dropdown
-    can be narrowed to what a chosen From connects to and the filter never
-    offers a combination with no line behind it.
+    Every real (volt_class, from, to) an actual line has. The filter is per
+    voltage level, so the client groups these by volt_class and, within a
+    level, narrows the To list to what a chosen From connects to - the filter
+    never offers a combination with no line behind it.
     """
 
-    from_substations: list[str]
-    to_substations: list[str]
-    pairs: list[tuple[str, str]]
+    pairs: list[tuple[str, str, str]]
 
 
 class SubstationLookup(BaseModel):

@@ -326,29 +326,23 @@ def layer_counts(db: Session) -> LayerCounts:
 
 
 def line_endpoints(db: Session, volt_class: str | None = None) -> SubstationEndpoints:
-    """Values for the line filter dropdowns.
+    """Every real (volt_class, from, to) a line has, for the line filter.
 
-    Ports GetMapData flag 2, which returned the same list for both ends by
-    unioning them. Kept as two lists so the two dropdowns can differ, plus
-    the real (from, to) pairs so the To list can be narrowed to what a
-    chosen From actually connects to.
+    Ports GetMapData flag 2. The map filter is per voltage level, so the
+    client groups these by volt_class and narrows the To list to what a
+    chosen From connects to within that level - a combination with no line
+    behind it is never offered.
     """
     _from = func.btrim(Line.from_substation)
     _to = func.btrim(Line.to_substation)
 
-    def distinct(col):
-        stmt = select(func.distinct(col)).where(col != "")
-        if volt_class:
-            stmt = stmt.where(Line.volt_class == volt_class)
-        return sorted(db.scalars(stmt.order_by(col)).all())
-
-    pair_stmt = select(func.distinct(_from), _to).where(_from != "", _to != "")
-    if volt_class:
-        pair_stmt = pair_stmt.where(Line.volt_class == volt_class)
-    pairs = sorted((a, b) for a, b in db.execute(pair_stmt))
-
-    return SubstationEndpoints(
-        from_substations=distinct(_from),
-        to_substations=distinct(_to),
-        pairs=pairs,
+    stmt = (
+        select(Line.volt_class, _from, _to)
+        .where(Line.volt_class.isnot(None), _from != "", _to != "")
+        .distinct()
     )
+    if volt_class:
+        stmt = stmt.where(Line.volt_class == volt_class)
+
+    pairs = sorted((vc, f, t) for vc, f, t in db.execute(stmt))
+    return SubstationEndpoints(pairs=pairs)

@@ -144,23 +144,55 @@
   color: var(--text-muted);
 }
 
-.layer-panel fieldset {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0.75rem;
+/* A collapsible panel section: a header button that folds the body away. */
+.panel-group {
   border: 1px solid var(--border);
   border-radius: 8px;
+  overflow: hidden;
 }
 
-.layer-panel legend {
-  padding: 0 0.35rem;
+.panel-group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  text-align: left;
+  background: var(--bg);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.panel-group-head:hover:not(:disabled) {
+  color: var(--text);
+  filter: none;
+}
+
+.panel-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+}
+
+/* disclosure triangle, rotates when its section is open */
+.panel-caret {
+  display: inline-block;
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.12s ease;
+}
+
+.panel-caret-open {
+  transform: rotate(90deg);
 }
 
 .layer-panel label {
@@ -234,19 +266,46 @@
   text-align: right;
 }
 
+/* one voltage level in the Transmission lines group: the checkbox row plus
+   its own foldable From/To search */
+.line-level {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.line-level-head {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.line-level-head .layer-row {
+  flex: 1;
+}
+
+.line-level-toggle {
+  display: flex;
+  align-items: center;
+  padding: 0.1rem 0.25rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+}
+
+.line-level-toggle:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--bg);
+  filter: none;
+}
+
 .line-filter {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--border);
-}
-
-.line-filter-title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-muted);
+  margin: 0 0 0.3rem 1.3rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
 }
 
 .line-filter label {

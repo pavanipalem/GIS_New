@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { MapContainer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { AppLayout } from "../components/AppLayout";
@@ -85,6 +86,42 @@ const countFor = (list: CountByCategory[] | undefined, voltClass: string) =>
 const total = (list: CountByCategory[] | undefined) =>
   list?.reduce((n, c) => n + c.count, 0) ?? 0;
 
+/** A collapsible panel section. Replaces the old <fieldset>/<legend>: the
+ * legacy MapView grouped its layers under headers that fold away, and with
+ * every group now carrying counts and sub-filters the panel is long enough
+ * that folding matters. */
+function PanelGroup({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="panel-group">
+      <button
+        type="button"
+        className="panel-group-head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span
+          className={open ? "panel-caret panel-caret-open" : "panel-caret"}
+          aria-hidden="true"
+        >
+          ▸
+        </span>
+        <span className="panel-group-title">{title}</span>
+      </button>
+      {open && <div className="panel-group-body">{children}</div>}
+    </section>
+  );
+}
+
 /** One layer row: its legend icon or colour swatch, its label, and the count
  * the legacy panel showed beside it. */
 function LayerRow({
@@ -126,16 +163,37 @@ export default function MapPage() {
   const [counts, setCounts] = useState<LayerCounts | null>(null);
   const [panelOpen, setPanelOpen] = useState(readPanelOpen);
 
-  // The From / To line search. Always shown, spans every line regardless of
-  // which voltage layers are on. Picking a From narrows To to the substations
-  // a line actually runs to from there, so the pair is never a combination
-  // with no line behind it. With neither set, every enabled line shows.
-  const [fromSs, setFromSs] = useState("");
-  const [toSs, setToSs] = useState("");
-  const [endpoints, setEndpoints] = useState<{
-    from: string[];
-    toByFrom: Map<string, string[]>;
-  }>({ from: [], toByFrom: new Map() });
+  // The From / To line search - one per voltage level, scoped to that level's
+  // lines. Picking a From narrows To to the substations a line actually runs
+  // to from there within that level, so the pair is never a combination with
+  // no line behind it. With neither set the level shows all its lines.
+  const [lineFilter, setLineFilter] = useState<
+    Record<VoltClass, { from: string; to: string }>
+  >({
+    "400": { from: "", to: "" },
+    "220": { from: "", to: "" },
+    "132": { from: "", to: "" },
+  });
+  // per-level: is the end-point search expanded? Shown by default; the user
+  // folds it away when not filtering that level.
+  const [lineFilterOpen, setLineFilterOpen] = useState<Record<VoltClass, boolean>>({
+    "400": true,
+    "220": true,
+    "132": true,
+  });
+  // raw (volt_class, from, to) triples from the API
+  const [linePairs, setLinePairs] = useState<[string, string, string][]>([]);
+
+  // collapsed panel groups, by id. Absent = open, so every group starts open.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const groupOpen = (id: string) => !collapsedGroups.has(id);
+  const toggleGroup = (id: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   useEffect(() => {
     mapApi
@@ -149,29 +207,41 @@ export default function MapPage() {
     mapApi
       .lineEndpoints()
       .then((e) => {
-        if (cancelled) return;
-        const toByFrom = new Map<string, string[]>();
-        for (const [f, t] of e.pairs) {
-          const list = toByFrom.get(f) ?? [];
-          if (!list.includes(t)) list.push(t);
-          toByFrom.set(f, list);
-        }
-        for (const list of toByFrom.values()) list.sort();
-        setEndpoints({ from: e.from_substations, toByFrom });
+        if (!cancelled) setLinePairs(e.pairs);
       })
       .catch(() => {
-        if (!cancelled) setEndpoints({ from: [], toByFrom: new Map() });
+        if (!cancelled) setLinePairs([]);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // To options: the destinations reachable from the chosen From, or every
-  // distinct To when no From is picked yet.
-  const toOptions = fromSs
-    ? endpoints.toByFrom.get(fromSs) ?? []
-    : [...new Set([...endpoints.toByFrom.values()].flat())].sort();
+  // pairs grouped by voltage: for each level, the distinct From values and,
+  // per From, the To values it connects to (plus every To, for when no From
+  // is picked).
+  const endpointsByVc = useMemo(() => {
+    const m = new Map<
+      string,
+      { froms: string[]; toByFrom: Map<string, string[]>; allTo: string[] }
+    >();
+    for (const [vc, f, t] of linePairs) {
+      let e = m.get(vc);
+      if (!e) {
+        e = { froms: [], toByFrom: new Map(), allTo: [] };
+        m.set(vc, e);
+      }
+      const tos = e.toByFrom.get(f) ?? [];
+      if (!tos.includes(t)) tos.push(t);
+      e.toByFrom.set(f, tos);
+    }
+    for (const e of m.values()) {
+      e.froms = [...e.toByFrom.keys()].sort();
+      e.allTo = [...new Set([...e.toByFrom.values()].flat())].sort();
+      for (const tos of e.toByFrom.values()) tos.sort();
+    }
+    return m;
+  }, [linePairs]);
 
   const toggle = (key: LayerKey) =>
     setOn((prev) => {
@@ -234,8 +304,7 @@ export default function MapPage() {
             </button>
           </div>
 
-          <fieldset>
-            <legend>Maps</legend>
+          <PanelGroup title="Maps" open={groupOpen("maps")} onToggle={() => toggleGroup("maps")}>
             {BASE_MAPS.map((b) => (
               <label className="layer-row" key={b.id}>
                 <input
@@ -247,10 +316,13 @@ export default function MapPage() {
                 <span className="layer-label">{b.label}</span>
               </label>
             ))}
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>Districts</legend>
+          <PanelGroup
+            title="Districts"
+            open={groupOpen("districts")}
+            onToggle={() => toggleGroup("districts")}
+          >
             {(
               [
                 ["none", "None"],
@@ -268,10 +340,13 @@ export default function MapPage() {
                 <span className="layer-label">{label}</span>
               </label>
             ))}
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>Substations</legend>
+          <PanelGroup
+            title="Substations"
+            open={groupOpen("substations")}
+            onToggle={() => toggleGroup("substations")}
+          >
             {VOLT_CLASSES.map((vc) => (
               <LayerRow
                 key={vc}
@@ -308,67 +383,118 @@ export default function MapPage() {
               count={counts?.pgcil_substations}
               icon={POINT_ICON.pgcil}
             />
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>Transmission lines</legend>
-            {VOLT_CLASSES.map((vc) => (
-              <LayerRow
-                key={vc}
-                checked={on.has(`line-${vc}`)}
-                onChange={() => toggle(`line-${vc}`)}
-                label={`${vc} kV`}
-                count={countFor(counts?.lines, vc)}
-                swatch={VOLT_COLOUR[vc]}
-              />
-            ))}
+          <PanelGroup
+            title="Transmission lines"
+            open={groupOpen("lines")}
+            onToggle={() => toggleGroup("lines")}
+          >
+            {VOLT_CLASSES.map((vc) => {
+              const ep = endpointsByVc.get(vc);
+              const f = lineFilter[vc];
+              const filterOpen = lineFilterOpen[vc];
+              const toOpts = f.from
+                ? ep?.toByFrom.get(f.from) ?? []
+                : ep?.allTo ?? [];
+              return (
+                <div className="line-level" key={vc}>
+                  <div className="line-level-head">
+                    <label className="layer-row">
+                      <input
+                        type="checkbox"
+                        checked={on.has(`line-${vc}`)}
+                        onChange={() => toggle(`line-${vc}`)}
+                      />
+                      <span
+                        className="layer-swatch"
+                        style={{ background: VOLT_COLOUR[vc] }}
+                        aria-hidden="true"
+                      />
+                      <span className="layer-label">{vc} kV</span>
+                      <span className="layer-count">{countFor(counts?.lines, vc)}</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="line-level-toggle"
+                      aria-expanded={filterOpen}
+                      title={
+                        filterOpen ? "Hide end-point search" : "Show end-point search"
+                      }
+                      onClick={() =>
+                        setLineFilterOpen((s) => ({ ...s, [vc]: !s[vc] }))
+                      }
+                    >
+                      <span
+                        className={
+                          filterOpen ? "panel-caret panel-caret-open" : "panel-caret"
+                        }
+                        aria-hidden="true"
+                      >
+                        ▸
+                      </span>
+                    </button>
+                  </div>
+
+                  {filterOpen && (
+                    <div className="line-filter">
+                      <label>
+                        <span>From</span>
+                        <select
+                          value={f.from}
+                          onChange={(e) =>
+                            // a To the new From does not reach would be a dead
+                            // filter, so drop it and let the user re-pick
+                            setLineFilter((s) => ({
+                              ...s,
+                              [vc]: { from: e.target.value, to: "" },
+                            }))
+                          }
+                        >
+                          <option value="">All</option>
+                          {(ep?.froms ?? []).map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>To</span>
+                        <select
+                          value={f.to}
+                          onChange={(e) =>
+                            setLineFilter((s) => ({
+                              ...s,
+                              [vc]: { ...s[vc], to: e.target.value },
+                            }))
+                          }
+                        >
+                          <option value="">All</option>
+                          {toOpts.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {(f.from || f.to) && (
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() =>
+                            setLineFilter((s) => ({ ...s, [vc]: { from: "", to: "" } }))
+                          }
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             <div className="layer-total">Lines total {linesTotal}</div>
-
-            <div className="line-filter">
-              <span className="line-filter-title">Search by end points</span>
-              <label>
-                <span>From</span>
-                <select
-                  value={fromSs}
-                  onChange={(e) => {
-                    setFromSs(e.target.value);
-                    // a To that the new From does not reach would be a dead
-                    // filter, so drop it and let the user re-pick
-                    setToSs("");
-                  }}
-                >
-                  <option value="">All</option>
-                  {endpoints.from.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>To</span>
-                <select value={toSs} onChange={(e) => setToSs(e.target.value)}>
-                  <option value="">All</option>
-                  {toOptions.map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {(fromSs || toSs) && (
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    setFromSs("");
-                    setToSs("");
-                  }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
 
             <LayerRow
               checked={on.has("pgcil-lines")}
@@ -377,10 +503,13 @@ export default function MapPage() {
               count={counts?.pgcil_lines}
               swatch="#4a4a4a"
             />
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>UG cables</legend>
+          <PanelGroup
+            title="UG cables"
+            open={groupOpen("ug")}
+            onToggle={() => toggleGroup("ug")}
+          >
             <LayerRow
               checked={on.has("ug-220")}
               onChange={() => toggle("ug-220")}
@@ -395,10 +524,13 @@ export default function MapPage() {
               count={countFor(counts?.underground_lines, "132")}
               swatch={UG_COLOUR["132"]}
             />
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>Generating station</legend>
+          <PanelGroup
+            title="Generating station"
+            open={groupOpen("generating")}
+            onToggle={() => toggleGroup("generating")}
+          >
             <LayerRow
               checked={on.has("hydel")}
               onChange={() => toggle("hydel")}
@@ -420,10 +552,13 @@ export default function MapPage() {
               count={counts?.solar_plants}
               icon={POINT_ICON.solar}
             />
-          </fieldset>
+          </PanelGroup>
 
-          <fieldset>
-            <legend>Consumers</legend>
+          <PanelGroup
+            title="Consumers"
+            open={groupOpen("consumers")}
+            onToggle={() => toggleGroup("consumers")}
+          >
             <LayerRow
               checked={on.has("ehv")}
               onChange={() => toggle("ehv")}
@@ -431,8 +566,7 @@ export default function MapPage() {
               count={counts?.ehv_consumers}
               icon={POINT_ICON.ehv}
             />
-          </fieldset>
-
+          </PanelGroup>
         </aside>
 
         <MapContainer
@@ -470,16 +604,15 @@ export default function MapPage() {
             />
           ))}
 
-          {/* the From/To search spans every line, so the same pair goes to
-              all groups - overhead and UG alike */}
+          {/* each overhead level filters by its own From/To pair */}
           {VOLT_CLASSES.map((vc) => (
             <LineLayerGroup
               key={`line-${vc}`}
               voltClass={vc}
               enabled={on.has(`line-${vc}`)}
               color={VOLT_COLOUR[vc]}
-              fromSubstation={fromSs}
-              toSubstation={toSs}
+              fromSubstation={lineFilter[vc].from}
+              toSubstation={lineFilter[vc].to}
             />
           ))}
 
@@ -488,16 +621,12 @@ export default function MapPage() {
             enabled={on.has("ug-220")}
             color={UG_COLOUR["220"]}
             underground
-            fromSubstation={fromSs}
-            toSubstation={toSs}
           />
           <LineLayerGroup
             voltClass="132"
             enabled={on.has("ug-132")}
             color={UG_COLOUR["132"]}
             underground
-            fromSubstation={fromSs}
-            toSubstation={toSs}
           />
 
           <TowerViewportLayer voltClasses={overheadVoltClasses} underground={false} />

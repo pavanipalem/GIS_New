@@ -138,9 +138,8 @@ export interface LayerCounts {
 }
 
 export interface SubstationEndpoints {
-  from_substations: string[];
-  to_substations: string[];
-  /** Every real (from, to) a line actually has, so the To dropdown can be
-   * narrowed to what a chosen From connects to. */
-  pairs: [string, string][];
+  /** Every real (volt_class, from, to) a line has. The filter is per voltage
+   * level: group by the first element, then within a level narrow the To
+   * list to what a chosen From connects to. */
+  pairs: [string, string, string][];
 }
