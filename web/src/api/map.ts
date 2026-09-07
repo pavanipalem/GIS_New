@@ -47,19 +47,28 @@ export const mapApi = {
    * result to towers on lines of those classes - the map passes the line
    * layers that are switched on, so towers for an unselected voltage never
    * come down. `underground` splits overhead-line towers (false) from
-   * UG-cable towers (true); omit for both. Rejects with 400 above 5,000
-   * towers, so only call it once zoomed in far enough. */
+   * UG-cable towers (true); omit for both. `from`/`to` mirror the level's
+   * From/To filter so a line narrowed to one feeder shows only its towers.
+   * Rejects with 400 above 5,000 towers, so only call it once zoomed in far
+   * enough. */
   towersInBbox: (
     west: number,
     south: number,
     east: number,
     north: number,
-    voltClasses: string[] = [],
-    underground?: boolean
+    opts: {
+      voltClasses?: string[];
+      underground?: boolean;
+      from?: string;
+      to?: string;
+    } = {}
   ) => {
     const params = new URLSearchParams({ bbox: `${west},${south},${east},${north}` });
-    for (const vc of voltClasses) params.append("volt_class", vc);
-    if (underground !== undefined) params.append("underground", String(underground));
+    for (const vc of opts.voltClasses ?? []) params.append("volt_class", vc);
+    if (opts.underground !== undefined)
+      params.append("underground", String(opts.underground));
+    if (opts.from) params.append("from_substation", opts.from);
+    if (opts.to) params.append("to_substation", opts.to);
     return get<TowerMarker[]>(`/map/towers?${params.toString()}`);
   },
   pgcilSubstations: () => get<PgcilSubstationMarker[]>("/map/pgcil-substations"),

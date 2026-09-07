@@ -38,10 +38,12 @@ export function SubstationLayerGroup({
   voltClass,
   category,
   enabled,
+  pointInRegion = null,
 }: {
   voltClass: VoltClass;
   category: SubstationCategory;
   enabled: boolean;
+  pointInRegion?: ((lat: number, lng: number) => boolean) | null;
 }) {
   const { data } = useLayerData<SubstationMarker>(enabled, () =>
     mapApi.substations(voltClass, category)
@@ -50,10 +52,13 @@ export function SubstationLayerGroup({
 
   const iconUrl =
     category === "lis_ww" ? LIS_WW_ICON[voltClass] : SUBSTATION_ICON[voltClass];
+  const points = pointInRegion
+    ? data.filter((s) => pointInRegion(s.lat, s.lng))
+    : data;
 
   return (
     <IconMarkerLayer
-      points={data}
+      points={points}
       iconUrl={iconUrl}
       size={VOLT_ICON_SIZE[voltClass]}
       keyOf={(s) => s.ss_code}

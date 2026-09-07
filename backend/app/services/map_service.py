@@ -166,6 +166,8 @@ def list_towers(
     bbox: tuple[float, float, float, float] | None = None,
     volt_classes: list[str] | None = None,
     underground: bool | None = None,
+    from_substation: str | None = None,
+    to_substation: str | None = None,
 ) -> list[TowerMarker]:
     """Towers are never returned unfiltered - 105k rows would flood the map.
     Exactly one of three scopes: a feeder, a point + radius, or a viewport
@@ -181,6 +183,10 @@ def list_towers(
     which are separate layers on the map with their own colours: the overhead
     tower layer asks for False, the UG cable tower layer for True, so a 132 kV
     tower is drawn once, by whichever of the two layers is on.
+
+    from_substation / to_substation mirror the map's From/To line filter: when
+    a voltage level is narrowed to one line, its towers narrow with it instead
+    of every tower of that voltage still showing on zoom.
     """
     scopes = [feeder_id is not None, radius_km is not None, bbox is not None]
     if sum(scopes) != 1:
@@ -235,6 +241,10 @@ def list_towers(
             stmt = stmt.where(Line.volt_class.in_(volt_classes))
         if underground is not None:
             stmt = stmt.where(Line.is_underground.is_(underground))
+        if from_substation:
+            stmt = stmt.where(func.btrim(Line.from_substation) == from_substation)
+        if to_substation:
+            stmt = stmt.where(func.btrim(Line.to_substation) == to_substation)
         stmt = (
             # seq_no order keeps a feeder's towers contiguous for the client
             stmt.order_by(Tower.feeder_id, Tower.seq_no).limit(MAX_TOWERS_PER_REQUEST + 1)

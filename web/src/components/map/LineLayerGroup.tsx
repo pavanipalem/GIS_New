@@ -1,6 +1,7 @@
 import { mapApi } from "../../api/map";
 import { useLayerData } from "./useLayerData";
 import { LineLayer } from "./LineLayer";
+import { routeInRegion } from "./regionFilter";
 import type { LineFeature } from "../../types/map";
 
 /** One component instance per voltage class - see SubstationLayerGroup for
@@ -23,6 +24,7 @@ export function LineLayerGroup({
   underground = false,
   fromSubstation = "",
   toSubstation = "",
+  pointInRegion = null,
 }: {
   voltClass: string;
   enabled: boolean;
@@ -30,6 +32,7 @@ export function LineLayerGroup({
   underground?: boolean;
   fromSubstation?: string;
   toSubstation?: string;
+  pointInRegion?: ((lat: number, lng: number) => boolean) | null;
 }) {
   const { data } = useLayerData<LineFeature>(enabled, () =>
     mapApi.lines(voltClass, underground ? true : undefined)
@@ -39,7 +42,8 @@ export function LineLayerGroup({
   const lines = data.filter(
     (l) =>
       (!fromSubstation || l.from_substation === fromSubstation) &&
-      (!toSubstation || l.to_substation === toSubstation)
+      (!toSubstation || l.to_substation === toSubstation) &&
+      (!pointInRegion || routeInRegion(l.path, pointInRegion))
   );
 
   return <LineLayer lines={lines} color={color} />;

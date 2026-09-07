@@ -19,6 +19,12 @@ import {
 } from "../components/map/viewRestriction";
 import { DistrictsLayer } from "../components/map/DistrictsLayer";
 import { BaseMapLayer } from "../components/map/BaseMapLayer";
+import { useRegionTest } from "../components/map/useRegionTest";
+import {
+  REGION_KEYS,
+  REGION_LABELS,
+  type RegionKey,
+} from "../components/map/regionFilter";
 import {
   BASE_MAPS,
   LIS_WW_ICON,
@@ -163,6 +169,20 @@ export default function MapPage() {
   const [counts, setCounts] = useState<LayerCounts | null>(null);
   const [panelOpen, setPanelOpen] = useState(readPanelOpen);
 
+  // Region spatial filter. The set holds the selected sub-regions; empty
+  // means "Telangana" (the default, whole state). All three selected is the
+  // whole state too, so useRegionTest returns null - no filtering - for both.
+  const [regions, setRegions] = useState<Set<RegionKey>>(new Set());
+  const pointInRegion = useRegionTest(regions);
+  const telanganaSelected = regions.size === 0 || regions.size === REGION_KEYS.length;
+  const toggleRegion = (key: RegionKey) =>
+    setRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   // The From / To line search - one per voltage level, scoped to that level's
   // lines. Picking a From narrows To to the substations a line actually runs
   // to from there within that level, so the pair is never a combination with
@@ -262,11 +282,10 @@ export default function MapPage() {
   const lisWwTotal = total(counts?.substations_lis_ww);
   const linesTotal = total(counts?.lines);
 
-  // Towers follow the line layers: a class's towers are drawn on zoom-in only
-  // while that class's line layer is on. Overhead lines and UG cables are
-  // tracked apart so each tower is drawn once, in its own layer's colour.
-  const overheadVoltClasses = VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`));
-  const ugVoltClasses = UG_VOLT_CLASSES.filter((vc) => on.has(`ug-${vc}`));
+  // Region filter for the point layers MapPage renders inline (the layer-
+  // group components take pointInRegion as a prop and filter themselves).
+  const inRegion = <T extends { lat: number; lng: number }>(rows: T[]) =>
+    pointInRegion ? rows.filter((r) => pointInRegion(r.lat, r.lng)) : rows;
 
   // The write is deliberately outside the state updater: React can call an
   // updater more than once, and that must stay free of side effects.
@@ -338,6 +357,32 @@ export default function MapPage() {
                   onChange={() => setDistricts(id)}
                 />
                 <span className="layer-label">{label}</span>
+              </label>
+            ))}
+          </PanelGroup>
+
+          <PanelGroup
+            title="Region"
+            open={groupOpen("region")}
+            onToggle={() => toggleGroup("region")}
+          >
+            <label className="layer-row">
+              <input
+                type="checkbox"
+                checked={telanganaSelected}
+                // "whole state" - clear the sub-regions back to the default
+                onChange={() => setRegions(new Set())}
+              />
+              <span className="layer-label">Telangana</span>
+            </label>
+            {REGION_KEYS.map((key) => (
+              <label className="layer-row" key={key}>
+                <input
+                  type="checkbox"
+                  checked={regions.has(key)}
+                  onChange={() => toggleRegion(key)}
+                />
+                <span className="layer-label">{REGION_LABELS[key]}</span>
               </label>
             ))}
           </PanelGroup>
@@ -592,6 +637,7 @@ export default function MapPage() {
               voltClass={vc}
               category="transco"
               enabled={on.has(`ss-${vc}`)}
+              pointInRegion={pointInRegion}
             />
           ))}
 
@@ -601,6 +647,7 @@ export default function MapPage() {
               voltClass={vc}
               category="lis_ww"
               enabled={on.has(`lisww-${vc}`)}
+              pointInRegion={pointInRegion}
             />
           ))}
 
@@ -613,6 +660,7 @@ export default function MapPage() {
               color={VOLT_COLOUR[vc]}
               fromSubstation={lineFilter[vc].from}
               toSubstation={lineFilter[vc].to}
+              pointInRegion={pointInRegion}
             />
           ))}
 
@@ -621,20 +669,41 @@ export default function MapPage() {
             enabled={on.has("ug-220")}
             color={UG_COLOUR["220"]}
             underground
+            pointInRegion={pointInRegion}
           />
           <LineLayerGroup
             voltClass="132"
             enabled={on.has("ug-132")}
             color={UG_COLOUR["132"]}
             underground
+            pointInRegion={pointInRegion}
           />
 
-          <TowerViewportLayer voltClasses={overheadVoltClasses} underground={false} />
-          <TowerViewportLayer voltClasses={ugVoltClasses} underground />
+          {/* one tower layer per line layer, so the towers shown match the
+              lines shown - the selected voltage, the level's From/To, and
+              nothing from an unselected category */}
+          {VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`)).map((vc) => (
+            <TowerViewportLayer
+              key={`tow-oh-${vc}`}
+              voltClass={vc}
+              underground={false}
+              fromSubstation={lineFilter[vc].from}
+              toSubstation={lineFilter[vc].to}
+              pointInRegion={pointInRegion}
+            />
+          ))}
+          {UG_VOLT_CLASSES.filter((vc) => on.has(`ug-${vc}`)).map((vc) => (
+            <TowerViewportLayer
+              key={`tow-ug-${vc}`}
+              voltClass={vc}
+              underground
+              pointInRegion={pointInRegion}
+            />
+          ))}
 
           {pgcilSs.data && on.has("pgcil-ss") && (
             <IconMarkerLayer
-              points={pgcilSs.data}
+              points={inRegion(pgcilSs.data)}
               iconUrl={POINT_ICON.pgcil}
               size={POINT_ICON_SIZE}
               keyOf={(p) => p.id}
@@ -651,7 +720,7 @@ export default function MapPage() {
 
           {pgcilLines.data && on.has("pgcil-lines") && (
             <PointLayer
-              points={pgcilLines.data}
+              points={inRegion(pgcilLines.data)}
               color="#4a4a4a"
               radius={2}
               keyOf={(p) => p.id}
@@ -661,7 +730,7 @@ export default function MapPage() {
 
           {hydel.data && on.has("hydel") && (
             <IconMarkerLayer
-              points={hydel.data}
+              points={inRegion(hydel.data)}
               iconUrl={POINT_ICON.hydel}
               size={POINT_ICON_SIZE}
               keyOf={(h) => h.hydel_id}
@@ -684,7 +753,7 @@ export default function MapPage() {
 
           {thermal.data && on.has("thermal") && (
             <IconMarkerLayer
-              points={thermal.data}
+              points={inRegion(thermal.data)}
               iconUrl={POINT_ICON.thermal}
               size={POINT_ICON_SIZE}
               keyOf={(t) => t.thermal_id}
@@ -707,7 +776,7 @@ export default function MapPage() {
 
           {solar.data && on.has("solar") && (
             <IconMarkerLayer
-              points={solar.data}
+              points={inRegion(solar.data)}
               iconUrl={POINT_ICON.solar}
               size={POINT_ICON_SIZE}
               keyOf={(s) => s.solar_id}
@@ -730,7 +799,7 @@ export default function MapPage() {
 
           {ehv.data && on.has("ehv") && (
             <IconMarkerLayer
-              points={ehv.data}
+              points={inRegion(ehv.data)}
               iconUrl={POINT_ICON.ehv}
               size={POINT_ICON_SIZE}
               keyOf={(e) => e.ehv_id}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { mapApi } from "../../api/map";
 import { ApiError } from "../../api/client";
@@ -32,25 +32,32 @@ function towerColour(t: TowerMarker, underground: boolean): string {
   return (underground ? ug[vc] : undefined) ?? overhead[vc] ?? FALLBACK_COLOUR;
 }
 
-/** Auto-loads and draws towers for whatever is on screen, once zoomed in
- * past TOWER_ZOOM_THRESHOLD. Refetches on pan/zoom, debounced, and drops
- * responses that arrive after a newer request has already been issued.
+/** Auto-loads and draws towers for one line layer once zoomed in past
+ * TOWER_ZOOM_THRESHOLD. Refetches on pan/zoom, debounced, and drops
+ * responses that arrive after a newer request has been issued.
  *
- * `voltClasses` is the set of line layers of this kind that are switched on.
- * Towers follow their line: with 220 selected and 132 not, zooming in shows
- * the 220 kV towers along the 220 kV corridors and nothing else. An empty
- * set means no line layer is on, so no towers are drawn or fetched.
+ * One instance per line voltage level (and one for each UG-cable level), so
+ * the towers shown match exactly the lines shown:
  *
- * `underground` picks which line kind this instance draws: the map mounts
- * one for the overhead transmission lines (false) and one for the UG cables
- * (true), each fed its own set of switched-on voltage classes, so a tower is
- * drawn once in the colour of the layer it belongs to. */
+ *   - `voltClass` + `underground` scope it to that layer, so a level that
+ *     is switched off contributes no towers.
+ *   - `fromSubstation` / `toSubstation` carry that level's From/To filter,
+ *     so when the level is narrowed to one line only that line's towers
+ *     appear - not every tower of the voltage.
+ *   - `pointInRegion`, when set, drops towers outside the chosen Region.
+ */
 export function TowerViewportLayer({
-  voltClasses,
+  voltClass,
   underground = false,
+  fromSubstation = "",
+  toSubstation = "",
+  pointInRegion = null,
 }: {
-  voltClasses: string[];
+  voltClass: string;
   underground?: boolean;
+  fromSubstation?: string;
+  toSubstation?: string;
+  pointInRegion?: ((lat: number, lng: number) => boolean) | null;
 }) {
   const map = useMap();
   const [towers, setTowers] = useState<TowerMarker[]>([]);
@@ -58,12 +65,8 @@ export function TowerViewportLayer({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
 
-  // a stable primitive for the effect dep, so [220,132] and [132,220] and a
-  // fresh array with the same contents do not each trigger a refetch
-  const voltKey = [...voltClasses].sort().join(",");
-
   const refresh = useCallback(() => {
-    if (!voltKey || map.getZoom() < TOWER_ZOOM_THRESHOLD) {
+    if (!voltClass || map.getZoom() < TOWER_ZOOM_THRESHOLD) {
       setTowers([]);
       setTooMany(false);
       return;
@@ -71,14 +74,12 @@ export function TowerViewportLayer({
     const b = map.getBounds();
     const seq = ++requestSeq.current;
     mapApi
-      .towersInBbox(
-        b.getWest(),
-        b.getSouth(),
-        b.getEast(),
-        b.getNorth(),
-        voltKey.split(","),
-        underground
-      )
+      .towersInBbox(b.getWest(), b.getSouth(), b.getEast(), b.getNorth(), {
+        voltClasses: [voltClass],
+        underground,
+        from: fromSubstation || undefined,
+        to: toSubstation || undefined,
+      })
       .then((data) => {
         if (seq !== requestSeq.current) return; // a newer request superseded this
         setTowers(data);
@@ -90,7 +91,7 @@ export function TowerViewportLayer({
         // 400 here means the viewport holds more than the endpoint will serve
         setTooMany(err instanceof ApiError && err.status === 400);
       });
-  }, [voltKey, underground, map]);
+  }, [voltClass, underground, fromSubstation, toSubstation, map]);
 
   const scheduleRefresh = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -106,14 +107,19 @@ export function TowerViewportLayer({
     };
   }, [refresh]);
 
-  if (!voltKey) return null;
+  const shown = useMemo(
+    () => (pointInRegion ? towers.filter((t) => pointInRegion(t.lat, t.lng)) : towers),
+    [towers, pointInRegion]
+  );
+
+  if (!voltClass) return null;
 
   return (
     <>
       {tooMany && (
         <div className="map-notice">Too many towers here - zoom in further to show them</div>
       )}
-      {towers.map((t) => {
+      {shown.map((t) => {
         const colour = towerColour(t, underground);
         return (
           <Circle
