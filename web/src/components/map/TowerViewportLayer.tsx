@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Circle, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { mapApi } from "../../api/map";
 import { ApiError } from "../../api/client";
+import { UG_COLOUR, VOLT_COLOUR } from "./layerConfig";
 import type { TowerMarker } from "../../types/map";
 
 // Legacy drew towers as 50 metre circles, which is under a pixel until you
@@ -19,29 +20,38 @@ const TOWER_RADIUS_METRES = 50;
 // a joint box wins, then "UC" in ADDITIONAL INFO, else the line's colour.
 const JOINT_BOX_COLOUR = "#FFFF00";
 const UC_COLOUR = "#f58c00";
-
-const VOLT_COLOUR: Record<string, string> = {
-  "400": "#d62728",
-  "220": "#ff7f0e",
-  "132": "#1f77b4",
-};
 const FALLBACK_COLOUR = "#6b6b6b";
 
-function towerColour(t: TowerMarker): string {
+function towerColour(t: TowerMarker, underground: boolean): string {
   if (t.telecom_joint_box && t.telecom_joint_box.trim()) return JOINT_BOX_COLOUR;
   if (t.additional_info?.trim() === "UC") return UC_COLOUR;
-  return VOLT_COLOUR[t.line_volt_class ?? ""] ?? FALLBACK_COLOUR;
+  // match the line the tower belongs to: UG cables have their own palette
+  const vc = t.line_volt_class ?? "";
+  const overhead = VOLT_COLOUR as Record<string, string>;
+  const ug = UG_COLOUR as Record<string, string>;
+  return (underground ? ug[vc] : undefined) ?? overhead[vc] ?? FALLBACK_COLOUR;
 }
 
 /** Auto-loads and draws towers for whatever is on screen, once zoomed in
  * past TOWER_ZOOM_THRESHOLD. Refetches on pan/zoom, debounced, and drops
  * responses that arrive after a newer request has already been issued.
  *
- * `voltClasses` is the set of transmission-line layers that are switched on.
+ * `voltClasses` is the set of line layers of this kind that are switched on.
  * Towers follow their line: with 220 selected and 132 not, zooming in shows
  * the 220 kV towers along the 220 kV corridors and nothing else. An empty
- * set means no line layer is on, so no towers are drawn or fetched. */
-export function TowerViewportLayer({ voltClasses }: { voltClasses: string[] }) {
+ * set means no line layer is on, so no towers are drawn or fetched.
+ *
+ * `underground` picks which line kind this instance draws: the map mounts
+ * one for the overhead transmission lines (false) and one for the UG cables
+ * (true), each fed its own set of switched-on voltage classes, so a tower is
+ * drawn once in the colour of the layer it belongs to. */
+export function TowerViewportLayer({
+  voltClasses,
+  underground = false,
+}: {
+  voltClasses: string[];
+  underground?: boolean;
+}) {
   const map = useMap();
   const [towers, setTowers] = useState<TowerMarker[]>([]);
   const [tooMany, setTooMany] = useState(false);
@@ -66,7 +76,8 @@ export function TowerViewportLayer({ voltClasses }: { voltClasses: string[] }) {
         b.getSouth(),
         b.getEast(),
         b.getNorth(),
-        voltKey.split(",")
+        voltKey.split(","),
+        underground
       )
       .then((data) => {
         if (seq !== requestSeq.current) return; // a newer request superseded this
@@ -79,7 +90,7 @@ export function TowerViewportLayer({ voltClasses }: { voltClasses: string[] }) {
         // 400 here means the viewport holds more than the endpoint will serve
         setTooMany(err instanceof ApiError && err.status === 400);
       });
-  }, [voltKey, map]);
+  }, [voltKey, underground, map]);
 
   const scheduleRefresh = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -103,7 +114,7 @@ export function TowerViewportLayer({ voltClasses }: { voltClasses: string[] }) {
         <div className="map-notice">Too many towers here - zoom in further to show them</div>
       )}
       {towers.map((t) => {
-        const colour = towerColour(t);
+        const colour = towerColour(t, underground);
         return (
           <Circle
             key={t.tower_id}

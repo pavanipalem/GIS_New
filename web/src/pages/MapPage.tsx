@@ -50,7 +50,12 @@ type LayerKey =
   | "solar"
   | "ehv";
 
-const DEFAULT_ON: LayerKey[] = ["ss-400", "ss-220", "ss-132"];
+// First load shows only the base map and the district outlines - the two
+// radio groups already default to "Open street" and "New districts". No data
+// layer is on until the user turns one on.
+const DEFAULT_ON: LayerKey[] = [];
+
+const UG_VOLT_CLASSES = ["220", "132"] as const;
 
 /** Whether the layer panel is open is remembered per browser: someone who
  * works mostly at full-map width should not have to collapse it on every
@@ -121,15 +126,16 @@ export default function MapPage() {
   const [counts, setCounts] = useState<LayerCounts | null>(null);
   const [panelOpen, setPanelOpen] = useState(readPanelOpen);
 
-  // The legacy "From / To" line search: pick a voltage class, then narrow that
-  // class's lines to a pair of end substations.
-  const [filterVolt, setFilterVolt] = useState<VoltClass | "">("");
+  // The From / To line search. Always shown, spans every line regardless of
+  // which voltage layers are on. Picking a From narrows To to the substations
+  // a line actually runs to from there, so the pair is never a combination
+  // with no line behind it. With neither set, every enabled line shows.
   const [fromSs, setFromSs] = useState("");
   const [toSs, setToSs] = useState("");
-  const [endpoints, setEndpoints] = useState<{ from: string[]; to: string[] }>({
-    from: [],
-    to: [],
-  });
+  const [endpoints, setEndpoints] = useState<{
+    from: string[];
+    toByFrom: Map<string, string[]>;
+  }>({ from: [], toByFrom: new Map() });
 
   useEffect(() => {
     mapApi
@@ -138,26 +144,34 @@ export default function MapPage() {
       .catch(() => setCounts(null));
   }, []);
 
-  // The From/To selections are cleared by the voltage-class change handler,
-  // not here, so this effect only ever touches the endpoint lists.
   useEffect(() => {
-    if (!filterVolt) {
-      setEndpoints({ from: [], to: [] });
-      return;
-    }
     let cancelled = false;
     mapApi
-      .lineEndpoints(filterVolt)
+      .lineEndpoints()
       .then((e) => {
-        if (!cancelled) setEndpoints({ from: e.from_substations, to: e.to_substations });
+        if (cancelled) return;
+        const toByFrom = new Map<string, string[]>();
+        for (const [f, t] of e.pairs) {
+          const list = toByFrom.get(f) ?? [];
+          if (!list.includes(t)) list.push(t);
+          toByFrom.set(f, list);
+        }
+        for (const list of toByFrom.values()) list.sort();
+        setEndpoints({ from: e.from_substations, toByFrom });
       })
       .catch(() => {
-        if (!cancelled) setEndpoints({ from: [], to: [] });
+        if (!cancelled) setEndpoints({ from: [], toByFrom: new Map() });
       });
     return () => {
       cancelled = true;
     };
-  }, [filterVolt]);
+  }, []);
+
+  // To options: the destinations reachable from the chosen From, or every
+  // distinct To when no From is picked yet.
+  const toOptions = fromSs
+    ? endpoints.toByFrom.get(fromSs) ?? []
+    : [...new Set([...endpoints.toByFrom.values()].flat())].sort();
 
   const toggle = (key: LayerKey) =>
     setOn((prev) => {
@@ -178,16 +192,11 @@ export default function MapPage() {
   const lisWwTotal = total(counts?.substations_lis_ww);
   const linesTotal = total(counts?.lines);
 
-  // Towers follow the transmission-line layers: a class's towers are drawn on
-  // zoom-in only while that class's line layer is on. Nothing to select
-  // separately - the old standalone "Towers" toggle showed every class at
-  // once regardless of what lines were on.
-  const enabledLineVoltClasses = VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`));
-
-  // A voltage class's lines are filtered only while that same class is the one
-  // chosen in the From/To search; the other classes keep showing everything.
-  const fromFor = (vc: VoltClass) => (filterVolt === vc ? fromSs : "");
-  const toFor = (vc: VoltClass) => (filterVolt === vc ? toSs : "");
+  // Towers follow the line layers: a class's towers are drawn on zoom-in only
+  // while that class's line layer is on. Overhead lines and UG cables are
+  // tracked apart so each tower is drawn once, in its own layer's colour.
+  const overheadVoltClasses = VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`));
+  const ugVoltClasses = UG_VOLT_CLASSES.filter((vc) => on.has(`ug-${vc}`));
 
   // The write is deliberately outside the state updater: React can call an
   // updater more than once, and that must stay free of side effects.
@@ -316,59 +325,48 @@ export default function MapPage() {
             <div className="layer-total">Lines total {linesTotal}</div>
 
             <div className="line-filter">
+              <span className="line-filter-title">Search by end points</span>
               <label>
-                <span>Search by end points</span>
+                <span>From</span>
                 <select
-                  value={filterVolt}
+                  value={fromSs}
                   onChange={(e) => {
-                    setFilterVolt(e.target.value as VoltClass | "");
-                    setFromSs("");
+                    setFromSs(e.target.value);
+                    // a To that the new From does not reach would be a dead
+                    // filter, so drop it and let the user re-pick
                     setToSs("");
                   }}
                 >
-                  <option value="">Off</option>
-                  {VOLT_CLASSES.map((vc) => (
-                    <option key={vc} value={vc}>
-                      {vc} kV
+                  <option value="">All</option>
+                  {endpoints.from.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
                     </option>
                   ))}
                 </select>
               </label>
-              {filterVolt && (
-                <>
-                  <label>
-                    <span>From</span>
-                    <select value={fromSs} onChange={(e) => setFromSs(e.target.value)}>
-                      <option value="">All</option>
-                      {endpoints.from.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>To</span>
-                    <select value={toSs} onChange={(e) => setToSs(e.target.value)}>
-                      <option value="">All</option>
-                      {endpoints.to.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      setFromSs("");
-                      setToSs("");
-                    }}
-                  >
-                    Clear
-                  </button>
-                </>
+              <label>
+                <span>To</span>
+                <select value={toSs} onChange={(e) => setToSs(e.target.value)}>
+                  <option value="">All</option>
+                  {toOptions.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {(fromSs || toSs) && (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    setFromSs("");
+                    setToSs("");
+                  }}
+                >
+                  Clear
+                </button>
               )}
             </div>
 
@@ -472,14 +470,16 @@ export default function MapPage() {
             />
           ))}
 
+          {/* the From/To search spans every line, so the same pair goes to
+              all groups - overhead and UG alike */}
           {VOLT_CLASSES.map((vc) => (
             <LineLayerGroup
               key={`line-${vc}`}
               voltClass={vc}
               enabled={on.has(`line-${vc}`)}
               color={VOLT_COLOUR[vc]}
-              fromSubstation={fromFor(vc)}
-              toSubstation={toFor(vc)}
+              fromSubstation={fromSs}
+              toSubstation={toSs}
             />
           ))}
 
@@ -488,15 +488,20 @@ export default function MapPage() {
             enabled={on.has("ug-220")}
             color={UG_COLOUR["220"]}
             underground
+            fromSubstation={fromSs}
+            toSubstation={toSs}
           />
           <LineLayerGroup
             voltClass="132"
             enabled={on.has("ug-132")}
             color={UG_COLOUR["132"]}
             underground
+            fromSubstation={fromSs}
+            toSubstation={toSs}
           />
 
-          <TowerViewportLayer voltClasses={enabledLineVoltClasses} />
+          <TowerViewportLayer voltClasses={overheadVoltClasses} underground={false} />
+          <TowerViewportLayer voltClasses={ugVoltClasses} underground />
 
           {pgcilSs.data && on.has("pgcil-ss") && (
             <IconMarkerLayer

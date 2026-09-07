@@ -165,6 +165,7 @@ def list_towers(
     radius_km: float | None = None,
     bbox: tuple[float, float, float, float] | None = None,
     volt_classes: list[str] | None = None,
+    underground: bool | None = None,
 ) -> list[TowerMarker]:
     """Towers are never returned unfiltered - 105k rows would flood the map.
     Exactly one of three scopes: a feeder, a point + radius, or a viewport
@@ -175,6 +176,11 @@ def list_towers(
     for the transmission-line layers that are actually switched on - an orphan
     tower, or one whose line is a different voltage, is left out rather than
     drawn in a colour for a layer the user did not select.
+
+    underground (True / False / None) splits overhead lines from UG cables,
+    which are separate layers on the map with their own colours: the overhead
+    tower layer asks for False, the UG cable tower layer for True, so a 132 kV
+    tower is drawn once, by whichever of the two layers is on.
     """
     scopes = [feeder_id is not None, radius_km is not None, bbox is not None]
     if sum(scopes) != 1:
@@ -227,6 +233,8 @@ def list_towers(
         )
         if volt_classes:
             stmt = stmt.where(Line.volt_class.in_(volt_classes))
+        if underground is not None:
+            stmt = stmt.where(Line.is_underground.is_(underground))
         stmt = (
             # seq_no order keeps a feeder's towers contiguous for the client
             stmt.order_by(Tower.feeder_id, Tower.seq_no).limit(MAX_TOWERS_PER_REQUEST + 1)
@@ -318,18 +326,29 @@ def layer_counts(db: Session) -> LayerCounts:
 
 
 def line_endpoints(db: Session, volt_class: str | None = None) -> SubstationEndpoints:
-    """Distinct From / To values, for the line filter dropdowns.
+    """Values for the line filter dropdowns.
 
     Ports GetMapData flag 2, which returned the same list for both ends by
-    unioning them. Kept as two lists so the two dropdowns can differ.
+    unioning them. Kept as two lists so the two dropdowns can differ, plus
+    the real (from, to) pairs so the To list can be narrowed to what a
+    chosen From actually connects to.
     """
+    _from = func.btrim(Line.from_substation)
+    _to = func.btrim(Line.to_substation)
+
     def distinct(col):
-        stmt = select(func.distinct(func.btrim(col))).where(col.isnot(None), func.btrim(col) != "")
+        stmt = select(func.distinct(col)).where(col != "")
         if volt_class:
             stmt = stmt.where(Line.volt_class == volt_class)
-        return sorted(db.scalars(stmt.order_by(func.btrim(col))).all())
+        return sorted(db.scalars(stmt.order_by(col)).all())
+
+    pair_stmt = select(func.distinct(_from), _to).where(_from != "", _to != "")
+    if volt_class:
+        pair_stmt = pair_stmt.where(Line.volt_class == volt_class)
+    pairs = sorted((a, b) for a, b in db.execute(pair_stmt))
 
     return SubstationEndpoints(
-        from_substations=distinct(Line.from_substation),
-        to_substations=distinct(Line.to_substation),
+        from_substations=distinct(_from),
+        to_substations=distinct(_to),
+        pairs=pairs,
     )

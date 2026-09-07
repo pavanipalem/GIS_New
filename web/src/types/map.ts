@@ -140,4 +140,7 @@ export interface LayerCounts {
 export interface SubstationEndpoints {
   from_substations: string[];
   to_substations: string[];
+  /** Every real (from, to) a line actually has, so the To dropdown can be
+   * narrowed to what a chosen From connects to. */
+  pairs: [string, string][];
 }

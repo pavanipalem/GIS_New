@@ -46,17 +46,20 @@ export const mapApi = {
   /** west,south,east,north in WGS84 degrees. `voltClasses` restricts the
    * result to towers on lines of those classes - the map passes the line
    * layers that are switched on, so towers for an unselected voltage never
-   * come down. Rejects with 400 above 5,000 towers, so only call it once
-   * zoomed in far enough. */
+   * come down. `underground` splits overhead-line towers (false) from
+   * UG-cable towers (true); omit for both. Rejects with 400 above 5,000
+   * towers, so only call it once zoomed in far enough. */
   towersInBbox: (
     west: number,
     south: number,
     east: number,
     north: number,
-    voltClasses: string[] = []
+    voltClasses: string[] = [],
+    underground?: boolean
   ) => {
     const params = new URLSearchParams({ bbox: `${west},${south},${east},${north}` });
     for (const vc of voltClasses) params.append("volt_class", vc);
+    if (underground !== undefined) params.append("underground", String(underground));
     return get<TowerMarker[]>(`/map/towers?${params.toString()}`);
   },
   pgcilSubstations: () => get<PgcilSubstationMarker[]>("/map/pgcil-substations"),

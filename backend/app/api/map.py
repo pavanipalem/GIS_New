@@ -105,6 +105,11 @@ def towers(
         description="Restrict to towers on lines of these voltage classes "
         "(repeatable). Only meaningful with bbox.",
     ),
+    underground: bool | None = Query(
+        default=None,
+        description="True: only UG-cable towers. False: only overhead-line "
+        "towers. Omitted: both. Only meaningful with bbox.",
+    ),
     db: Session = Depends(get_db),
 ):
     parsed_bbox: tuple[float, float, float, float] | None = None
@@ -126,7 +131,7 @@ def towers(
         parsed_bbox = (west, south, east, north)
 
     return map_service.list_towers(
-        db, feeder_id, near_lat, near_lng, radius_km, parsed_bbox, volt_class
+        db, feeder_id, near_lat, near_lng, radius_km, parsed_bbox, volt_class, underground
     )
 
 
