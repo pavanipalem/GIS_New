@@ -35,6 +35,39 @@ class SubstationMarker(BaseModel):
     lng: float
 
 
+class ThermalPowerStationMarker(BaseModel):
+    thermal_id: int
+    name: str | None
+    gen_cap_mw: float | None
+    connected_ss: str | None
+    lat: float
+    lng: float
+
+
+class LayerCounts(BaseModel):
+    """Counts behind the map panel, so it can label each layer the way the
+    legacy panel did (400 KV 21, 220 KV 78, ...) without loading the layers."""
+
+    substations_transco: list[CountByCategory]
+    substations_lis_ww: list[CountByCategory]
+    lines: list[CountByCategory]
+    underground_lines: list[CountByCategory]
+    pgcil_substations: int
+    pgcil_lines: int
+    solar_plants: int
+    hydel_stations: int
+    thermal_stations: int
+    ehv_consumers: int
+
+
+class SubstationEndpoints(BaseModel):
+    """Distinct From / To values for a voltage class, for the line filter -
+    GetMapData flag 2."""
+
+    from_substations: list[str]
+    to_substations: list[str]
+
+
 class SubstationLookup(BaseModel):
     ss_code: int
     title: str
@@ -68,6 +101,7 @@ class EhvConsumerMarker(BaseModel):
 
 class LineFeature(BaseModel):
     feeder_id: int
+    is_underground: bool = False
     feeder_name: str | None
     volt_class: str | None
     from_substation: str | None

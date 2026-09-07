@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from geoalchemy2 import Geography
-from sqlalchemy import Identity, Index, Numeric, String, Text
+from sqlalchemy import BigInteger, Identity, Index, Numeric, Sequence, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -76,6 +76,32 @@ class PgcilLine(Base):
 
     id: Mapped[int] = mapped_column(Identity(), primary_key=True)
     feeder_name: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(
+        Geography("POINT", srid=4326, spatial_index=False)
+    )
+
+
+class ThermalPowerStation(Base):
+    """legacy_raw.thermalpowerstations (14 rows). Same shape as hydel; missed
+    by the original migration and brought across in 0009."""
+
+    __tablename__ = "thermal_power_station"
+    __table_args__ = (
+        Index("ix_thermal_power_station_location", "location", postgresql_using="gist"),
+    )
+
+    thermal_id: Mapped[int] = mapped_column(
+        BigInteger,
+        Sequence("thermal_power_station_thermal_id_seq", schema="gis"),
+        primary_key=True,
+    )
+    name: Mapped[str | None] = mapped_column(Text)
+    gen_cap_mw: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    connected_ss: Mapped[str | None] = mapped_column(Text)
+    volt_level: Mapped[str | None] = mapped_column(String(50))
+    division: Mapped[str | None] = mapped_column(String(100))
+    circle: Mapped[str | None] = mapped_column(String(100))
+    zone: Mapped[str | None] = mapped_column(String(100))
     location: Mapped[str | None] = mapped_column(
         Geography("POINT", srid=4326, spatial_index=False)
     )

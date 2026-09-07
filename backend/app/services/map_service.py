@@ -4,17 +4,23 @@ import json
 
 from fastapi import HTTPException, status
 from geoalchemy2 import Geography, Geometry
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.ehv_consumer import EhvConsumer
 from app.models.line import Line
-from app.models.pgcil import HydelPowerStation, PgcilLine, PgcilSubstation
+from app.models.pgcil import (
+    HydelPowerStation,
+    PgcilLine,
+    PgcilSubstation,
+    ThermalPowerStation,
+)
 from app.models.solar_plant import SolarPlant
 from app.models.substation import Substation
 from app.models.tower import Tower
 from app.schemas.map import (
     CountByCategory,
+    LayerCounts,
     EhvConsumerMarker,
     HydelPowerStationMarker,
     LineFeature,
@@ -22,8 +28,10 @@ from app.schemas.map import (
     PgcilLineMarker,
     PgcilSubstationMarker,
     SolarPlantMarker,
+    SubstationEndpoints,
     SubstationLookup,
     SubstationMarker,
+    ThermalPowerStationMarker,
     TowerMarker,
 )
 
@@ -44,7 +52,15 @@ def _lng(col):
 
 
 # --------------------------------------------------------------- substations
-def list_substations(db: Session, volt_class: str | None = None) -> list[SubstationMarker]:
+def list_substations(
+    db: Session, volt_class: str | None = None, category: str = "transco"
+) -> list[SubstationMarker]:
+    """category mirrors the legacy panel's split.
+
+    "transco" excludes ss_type LIS/LI/WW, exactly as GetMapData flags 1-8 did.
+    "lis_ww" is the complement, which the panel lists as its own group with its
+    own counts. "all" applies no type filter.
+    """
     stmt = (
         select(
             Substation.ss_code, Substation.ss_name, Substation.ss_type,
@@ -55,8 +71,13 @@ def list_substations(db: Session, volt_class: str | None = None) -> list[Substat
             _lat(Substation.location), _lng(Substation.location),
         )
         .where(Substation.location.isnot(None))
-        .where(Substation.ss_type.notin_(_EXCLUDED_SS_TYPES))
     )
+    if category == "transco":
+        stmt = stmt.where(
+            or_(Substation.ss_type.notin_(_EXCLUDED_SS_TYPES), Substation.ss_type.is_(None))
+        )
+    elif category == "lis_ww":
+        stmt = stmt.where(Substation.ss_type.in_(_EXCLUDED_SS_TYPES))
     if volt_class:
         stmt = stmt.where(Substation.volt_class == volt_class)
     return [SubstationMarker(**row._mapping) for row in db.execute(stmt)]
@@ -106,14 +127,19 @@ def list_ehv_consumers(db: Session) -> list[EhvConsumerMarker]:
 
 
 # --------------------------------------------------------------------- lines
-def list_lines(db: Session, volt_class: str | None = None) -> list[LineFeature]:
+def list_lines(
+    db: Session, volt_class: str | None = None, underground: bool | None = None
+) -> list[LineFeature]:
     stmt = select(
         Line.feeder_id, Line.feeder_name, Line.volt_class,
         Line.from_substation, Line.to_substation, Line.tower_count, Line.length_ckm,
+        Line.is_underground,
         func.ST_AsGeoJSON(cast(Line.route, Geometry)).label("geojson"),
     ).where(Line.route.isnot(None))
     if volt_class:
         stmt = stmt.where(Line.volt_class == volt_class)
+    if underground is not None:
+        stmt = stmt.where(Line.is_underground.is_(underground))
 
     out = []
     for row in db.execute(stmt):
@@ -229,3 +255,71 @@ def list_pgcil_lines(db: Session) -> list[PgcilLineMarker]:
         _lat(PgcilLine.location), _lng(PgcilLine.location),
     ).where(PgcilLine.location.isnot(None))
     return [PgcilLineMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def list_thermal_power_stations(db: Session) -> list[ThermalPowerStationMarker]:
+    stmt = select(
+        ThermalPowerStation.thermal_id, ThermalPowerStation.name,
+        ThermalPowerStation.gen_cap_mw, ThermalPowerStation.connected_ss,
+        _lat(ThermalPowerStation.location), _lng(ThermalPowerStation.location),
+    ).where(ThermalPowerStation.location.isnot(None))
+    return [ThermalPowerStationMarker(**row._mapping) for row in db.execute(stmt)]
+
+
+def _counts_by_volt(stmt) -> list[CountByCategory]:
+    return [CountByCategory(category=c or "unknown", count=n) for c, n in stmt]
+
+
+def layer_counts(db: Session) -> LayerCounts:
+    """Everything the map panel needs to label its layers, in one call."""
+    transco = db.execute(
+        select(Substation.volt_class, func.count(Substation.ss_code))
+        .where(or_(Substation.ss_type.notin_(_EXCLUDED_SS_TYPES), Substation.ss_type.is_(None)))
+        .group_by(Substation.volt_class).order_by(Substation.volt_class.desc())
+    )
+    lis_ww = db.execute(
+        select(Substation.volt_class, func.count(Substation.ss_code))
+        .where(Substation.ss_type.in_(_EXCLUDED_SS_TYPES))
+        .group_by(Substation.volt_class).order_by(Substation.volt_class.desc())
+    )
+    lines = db.execute(
+        select(Line.volt_class, func.count(Line.feeder_id))
+        .group_by(Line.volt_class).order_by(Line.volt_class.desc())
+    )
+    ug = db.execute(
+        select(Line.volt_class, func.count(Line.feeder_id))
+        .where(Line.is_underground.is_(True))
+        .group_by(Line.volt_class).order_by(Line.volt_class.desc())
+    )
+    one = lambda model, col: db.scalar(select(func.count(col)).select_from(model)) or 0  # noqa: E731
+
+    return LayerCounts(
+        substations_transco=_counts_by_volt(transco),
+        substations_lis_ww=_counts_by_volt(lis_ww),
+        lines=_counts_by_volt(lines),
+        underground_lines=_counts_by_volt(ug),
+        pgcil_substations=one(PgcilSubstation, PgcilSubstation.id),
+        pgcil_lines=one(PgcilLine, PgcilLine.id),
+        solar_plants=one(SolarPlant, SolarPlant.solar_id),
+        hydel_stations=one(HydelPowerStation, HydelPowerStation.hydel_id),
+        thermal_stations=one(ThermalPowerStation, ThermalPowerStation.thermal_id),
+        ehv_consumers=one(EhvConsumer, EhvConsumer.ehv_id),
+    )
+
+
+def line_endpoints(db: Session, volt_class: str | None = None) -> SubstationEndpoints:
+    """Distinct From / To values, for the line filter dropdowns.
+
+    Ports GetMapData flag 2, which returned the same list for both ends by
+    unioning them. Kept as two lists so the two dropdowns can differ.
+    """
+    def distinct(col):
+        stmt = select(func.distinct(func.btrim(col))).where(col.isnot(None), func.btrim(col) != "")
+        if volt_class:
+            stmt = stmt.where(Line.volt_class == volt_class)
+        return sorted(db.scalars(stmt.order_by(func.btrim(col))).all())
+
+    return SubstationEndpoints(
+        from_substations=distinct(Line.from_substation),
+        to_substations=distinct(Line.to_substation),
+    )

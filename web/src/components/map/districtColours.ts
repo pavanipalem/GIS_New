@@ -38,3 +38,18 @@ export const DISTRICT_COLOURS: Record<string, string> = {
 };
 
 export const DISTRICT_FALLBACK = "#DDDDDD";
+
+// The pre-2016 districts (districtsold.json), which key on D_N rather
+// than name and are upper-cased.
+export const OLD_DISTRICT_COLOURS: Record<string, string> = {
+  "ADILABAD": "#FBCFA3",
+  "HYDERABAD": "#5DBCD2",
+  "KARIMNAGAR": "#F6BDD3",
+  "KHAMMAM": "#ECC2D3",
+  "MAHABUBNAGAR": "#B2CFAA",
+  "MEDAK": "#C7C8AB",
+  "NALGONDA": "#DBD6ED",
+  "NIZAMABAD": "#D4B0BE",
+  "RANGAREDDY": "#F0F6B0",
+  "WARANGAL": "#9390A3",
+};

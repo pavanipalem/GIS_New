@@ -5,14 +5,17 @@ from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.schemas.map import (
     CountByCategory,
+    LayerCounts,
     EhvConsumerMarker,
     HydelPowerStationMarker,
     LineFeature,
     PgcilLineMarker,
     PgcilSubstationMarker,
     SolarPlantMarker,
+    SubstationEndpoints,
     SubstationLookup,
     SubstationMarker,
+    ThermalPowerStationMarker,
     TowerMarker,
 )
 from app.services import map_service
@@ -25,8 +28,17 @@ router = APIRouter(
 
 
 @router.get("/substations", response_model=list[SubstationMarker])
-def substations(volt_class: str | None = None, db: Session = Depends(get_db)):
-    return map_service.list_substations(db, volt_class)
+def substations(
+    volt_class: str | None = None,
+    category: str = Query(
+        default="transco",
+        pattern="^(transco|lis_ww|all)$",
+        description='"transco" excludes ss_type LIS/LI/WW as the legacy map did; '
+        '"lis_ww" is that group on its own',
+    ),
+    db: Session = Depends(get_db),
+):
+    return map_service.list_substations(db, volt_class, category)
 
 
 @router.get("/substations/summary", response_model=list[CountByCategory])
@@ -50,8 +62,31 @@ def ehv_consumers(db: Session = Depends(get_db)):
 
 
 @router.get("/lines", response_model=list[LineFeature])
-def lines(volt_class: str | None = None, db: Session = Depends(get_db)):
-    return map_service.list_lines(db, volt_class)
+def lines(
+    volt_class: str | None = None,
+    underground: bool | None = Query(
+        default=None, description="Filter to (or exclude) underground cables"
+    ),
+    db: Session = Depends(get_db),
+):
+    return map_service.list_lines(db, volt_class, underground)
+
+
+@router.get("/lines/endpoints", response_model=SubstationEndpoints)
+def line_endpoints(volt_class: str | None = None, db: Session = Depends(get_db)):
+    """Distinct From / To values for the line filter dropdowns."""
+    return map_service.line_endpoints(db, volt_class)
+
+
+@router.get("/layer-counts", response_model=LayerCounts)
+def layer_counts(db: Session = Depends(get_db)):
+    """Every count the map panel shows beside a layer name, in one call."""
+    return map_service.layer_counts(db)
+
+
+@router.get("/thermal-power-stations", response_model=list[ThermalPowerStationMarker])
+def thermal_power_stations(db: Session = Depends(get_db)):
+    return map_service.list_thermal_power_stations(db)
 
 
 @router.get("/towers", response_model=list[TowerMarker])

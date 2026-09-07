@@ -3,7 +3,19 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Date, DateTime, Index, Integer, Numeric, Sequence, String, Text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    Numeric,
+    Sequence,
+    String,
+    Text,
+    false,
+)
+from sqlalchemy import text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -26,6 +38,11 @@ class Line(Base):
         Index("ix_line_route", "route", postgresql_using="gist"),
         Index("ix_line_volt_class", "volt_class"),
         Index("ix_line_zone_circle", "zone", "circle"),
+        Index(
+            "ix_line_is_underground",
+            "is_underground",
+            postgresql_where=text("is_underground"),
+        ),
     )
 
     # IDENTITY in SQL Server; a sequence here (migration 0006) so new lines
@@ -78,6 +95,18 @@ class Line(Base):
         Geography("LINESTRING", srid=4326, spatial_index=False)
     )
     tower_count: Mapped[int | None] = mapped_column(Integer)
+    # Replaces the hardcoded FEEDER_ID lists the legacy map procs used to
+    # drive the UG Cables layers - see migration 0009.
+    is_underground: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+        comment=(
+            "Underground cable. Replaces the hardcoded FEEDER_ID lists that the "
+            'legacy map procedures used to drive the "UG Cables" layers.'
+        ),
+    )
 
     inserted_by: Mapped[str | None] = mapped_column(String(50))
     inserted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

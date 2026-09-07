@@ -58,6 +58,7 @@ export interface EhvConsumerMarker {
 
 export interface LineFeature {
   feeder_id: number;
+  is_underground: boolean;
   feeder_name: string | null;
   volt_class: string | null;
   from_substation: string | null;
@@ -111,4 +112,32 @@ export interface PgcilLineMarker {
   feeder_name: string | null;
   lat: number;
   lng: number;
+}
+
+export interface ThermalPowerStationMarker {
+  thermal_id: number;
+  name: string | null;
+  gen_cap_mw: number | null;
+  connected_ss: string | null;
+  lat: number;
+  lng: number;
+}
+
+/** Everything the map panel needs to label its layers, in one call. */
+export interface LayerCounts {
+  substations_transco: CountByCategory[];
+  substations_lis_ww: CountByCategory[];
+  lines: CountByCategory[];
+  underground_lines: CountByCategory[];
+  pgcil_substations: number;
+  pgcil_lines: number;
+  solar_plants: number;
+  hydel_stations: number;
+  thermal_stations: number;
+  ehv_consumers: number;
+}
+
+export interface SubstationEndpoints {
+  from_substations: string[];
+  to_substations: string[];
 }
