@@ -81,7 +81,7 @@
   width: 24px;
   height: 24px;
   line-height: 1;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
   background: none;
   border: 1px solid transparent;
@@ -95,13 +95,14 @@
   filter: none;
 }
 
-/* Sits over the map once the panel is gone. Top right, not top left: that
-   corner already holds Leaflet's zoom control, and top right is where
-   Leaflet puts its own layer control by default. */
+/* Sits over the map once the panel is gone, on the same side the panel
+   itself occupies - hide and show happen in one place rather than the
+   control jumping across the map. Leaflet's zoom control shares this corner,
+   so it is nudged down for as long as the button is there (below). */
 .layer-panel-open {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   z-index: 600;
   padding: 0.35rem 0.7rem;
   font-size: 0.85rem;
@@ -115,6 +116,10 @@
 .layer-panel-open:hover:not(:disabled) {
   background: var(--bg);
   filter: none;
+}
+
+.map-page-collapsed .leaflet-top.leaflet-left {
+  margin-top: 40px;
 }
 
 .layer-panel {

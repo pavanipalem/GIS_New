@@ -191,7 +191,7 @@ export default function MapPage() {
 
   return (
     <AppLayout fullBleed>
-      <div className="map-page">
+      <div className={panelOpen ? "map-page" : "map-page map-page-collapsed"}>
         {!panelOpen && (
           <button
             type="button"
@@ -213,7 +213,7 @@ export default function MapPage() {
               title="Hide the layer menu"
               aria-label="Hide the layer menu"
             >
-              ×
+              <span aria-hidden="true">«</span>
             </button>
           </div>
 
