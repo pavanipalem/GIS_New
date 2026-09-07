@@ -13,6 +13,12 @@ import {
   TOWER_ZOOM_THRESHOLD,
 } from "../components/map/TowerViewportLayer";
 import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
+import { ClampNorth } from "../components/map/ClampNorth";
+import {
+  ALLOWED_BOUNDS,
+  MAX_ZOOM,
+  MIN_ZOOM,
+} from "../components/map/viewRestriction";
 import { DistrictsLayer } from "../components/map/DistrictsLayer";
 import { BaseMapLayer } from "../components/map/BaseMapLayer";
 import {
@@ -439,8 +445,20 @@ export default function MapPage() {
           </fieldset>
         </aside>
 
-        <MapContainer center={TELANGANA_CENTER} zoom={DEFAULT_ZOOM} className="map-container">
+        <MapContainer
+          center={TELANGANA_CENTER}
+          zoom={DEFAULT_ZOOM}
+          className="map-container"
+          // the legacy view restriction: no panning up into north India
+          maxBounds={ALLOWED_BOUNDS}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          // inertia off, as in drawmap() - a flick that coasts past the
+          // limit only to be yanked back reads as the map fighting you
+          inertia={false}
+        >
           <InvalidateSizeOnResize />
+          <ClampNorth />
           <BaseMapLayer baseMap={baseMap} />
           <DistrictsLayer set={districts} />
 
