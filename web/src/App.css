@@ -51,7 +51,70 @@
 /* ----------------------------------------------------------------- map */
 .map-page {
   display: flex;
+  position: relative;
   height: 100%;
+}
+
+/* The panel hides so the map can use the full width. `hidden` alone is not
+   enough - the panel's own display:flex would beat the attribute's UA rule -
+   and Leaflet is told nothing here: InvalidateSizeOnResize already watches
+   the map container, so the resize corrects itself. */
+.layer-panel[hidden] {
+  display: none;
+}
+
+.layer-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: -0.25rem;
+}
+
+.layer-panel-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.layer-panel-hide {
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.layer-panel-hide:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+  filter: none;
+}
+
+/* Sits over the map once the panel is gone. Top right, not top left: that
+   corner already holds Leaflet's zoom control, and top right is where
+   Leaflet puts its own layer control by default. */
+.layer-panel-open {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 600;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(28, 31, 36, 0.18);
+}
+
+.layer-panel-open:hover:not(:disabled) {
+  background: var(--bg);
+  filter: none;
 }
 
 .layer-panel {
@@ -229,40 +292,145 @@
   align-items: center;
   gap: 1.25rem;
   flex: 0 0 auto;
-  padding: 0.6rem 1.25rem;
+  padding: 0.5rem 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(28, 31, 36, 0.04);
 }
 
 .app-brand {
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
 }
 
+.app-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 7px;
+}
+
+.app-brand-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* One scrollable strip - the header sits above the map, so wrapping to a
+   second line would take height away from it. */
 .app-nav {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.15rem;
   flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.app-nav a {
+.app-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.app-nav-link {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
   text-decoration: none;
-  padding: 0.2rem 0;
-  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  border-radius: 7px;
+  transition: background 0.12s, color 0.12s;
 }
 
-.app-nav a:hover {
+.app-nav-link:hover {
   color: var(--text);
+  background: rgba(31, 119, 180, 0.07);
 }
 
-.app-nav a.active {
-  color: var(--text);
-  border-bottom-color: var(--accent);
+.app-nav-link.active {
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(31, 119, 180, 0.12);
+}
+
+.app-nav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.app-nav-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 0.4rem;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
 }
 
 .app-user {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.app-user-name {
+  font-weight: 500;
+}
+
+/* The role decides what the app lets you do, so it is worth reading at a
+   glance rather than hiding in a parenthesis. */
+.app-role {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.app-role-admin {
+  color: #8a4b00;
+  background: #fff3e0;
+  border-color: #f0cfa0;
+}
+
+.app-role-editor {
+  color: #14532d;
+  background: #e7f6ec;
+  border-color: #b6dfc4;
+}
+
+.app-signout {
+  padding: 0.3rem 0.7rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.app-signout:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg);
+  filter: none;
 }
 
 .app-main {

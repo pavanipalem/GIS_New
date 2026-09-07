@@ -50,6 +50,28 @@ type LayerKey =
 
 const DEFAULT_ON: LayerKey[] = ["ss-400", "ss-220", "ss-132", "towers"];
 
+/** Whether the layer panel is open is remembered per browser: someone who
+ * works mostly at full-map width should not have to collapse it on every
+ * visit. Storage can throw (private windows, blocked site data), and the
+ * panel open is the safe default either way. */
+const PANEL_KEY = "gis.map.panelOpen";
+
+const readPanelOpen = () => {
+  try {
+    return window.localStorage.getItem(PANEL_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+
+const writePanelOpen = (open: boolean) => {
+  try {
+    window.localStorage.setItem(PANEL_KEY, open ? "1" : "0");
+  } catch {
+    // not worth surfacing - the panel still works, it just won't be remembered
+  }
+};
+
 const countFor = (list: CountByCategory[] | undefined, voltClass: string) =>
   list?.find((c) => c.category === voltClass)?.count ?? 0;
 
@@ -95,6 +117,7 @@ export default function MapPage() {
   const [baseMap, setBaseMap] = useState<BaseMapId>("osm");
   const [districts, setDistricts] = useState<DistrictSet>("new");
   const [counts, setCounts] = useState<LayerCounts | null>(null);
+  const [panelOpen, setPanelOpen] = useState(readPanelOpen);
 
   // The legacy "From / To" line search: pick a voltage class, then narrow that
   // class's lines to a pair of end substations.
@@ -158,10 +181,42 @@ export default function MapPage() {
   const fromFor = (vc: VoltClass) => (filterVolt === vc ? fromSs : "");
   const toFor = (vc: VoltClass) => (filterVolt === vc ? toSs : "");
 
+  // The write is deliberately outside the state updater: React can call an
+  // updater more than once, and that must stay free of side effects.
+  const togglePanel = () => {
+    const next = !panelOpen;
+    setPanelOpen(next);
+    writePanelOpen(next);
+  };
+
   return (
     <AppLayout fullBleed>
       <div className="map-page">
-        <aside className="layer-panel">
+        {!panelOpen && (
+          <button
+            type="button"
+            className="layer-panel-open"
+            onClick={togglePanel}
+            title="Show the layer menu"
+          >
+            <span aria-hidden="true">☰</span> Layers
+          </button>
+        )}
+
+        <aside className="layer-panel" hidden={!panelOpen}>
+          <div className="layer-panel-head">
+            <h2>Layers</h2>
+            <button
+              type="button"
+              className="layer-panel-hide"
+              onClick={togglePanel}
+              title="Hide the layer menu"
+              aria-label="Hide the layer menu"
+            >
+              ×
+            </button>
+          </div>
+
           <fieldset>
             <legend>Maps</legend>
             {BASE_MAPS.map((b) => (
