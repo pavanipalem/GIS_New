@@ -681,12 +681,13 @@ export default function MapPage() {
 
           {/* one tower layer per line layer, so the towers shown match the
               lines shown - the selected voltage, the level's From/To, and
-              nothing from an unselected category */}
+              nothing from an unselected category. The overhead levels draw
+              every line of the voltage (UG-flagged ones included), so no
+              `underground` filter here. */}
           {VOLT_CLASSES.filter((vc) => on.has(`line-${vc}`)).map((vc) => (
             <TowerViewportLayer
               key={`tow-oh-${vc}`}
               voltClass={vc}
-              underground={false}
               fromSubstation={lineFilter[vc].from}
               toSubstation={lineFilter[vc].to}
               pointInRegion={pointInRegion}

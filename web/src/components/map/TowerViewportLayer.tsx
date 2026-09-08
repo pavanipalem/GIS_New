@@ -36,11 +36,17 @@ function towerColour(t: TowerMarker, underground: boolean): string {
  * TOWER_ZOOM_THRESHOLD. Refetches on pan/zoom, debounced, and drops
  * responses that arrive after a newer request has been issued.
  *
- * One instance per line voltage level (and one for each UG-cable level), so
- * the towers shown match exactly the lines shown:
+ * One instance per line voltage level, plus one per UG-cable level, so the
+ * towers shown match exactly the lines shown:
  *
- *   - `voltClass` + `underground` scope it to that layer, so a level that
- *     is switched off contributes no towers.
+ *   - `voltClass` scopes it to that voltage; a level that is switched off
+ *     contributes no towers.
+ *   - `underground` is left undefined for the overhead "Transmission lines"
+ *     levels, which draw *every* line of the voltage - a line flagged as an
+ *     underground cable still shows there (and in the count), so its towers
+ *     must too, in the overhead colour. The UG-cable levels pass `true` to
+ *     highlight just that subset in the UG colour; with both layers on the
+ *     towers draw twice, exactly as the polylines already do.
  *   - `fromSubstation` / `toSubstation` carry that level's From/To filter,
  *     so when the level is narrowed to one line only that line's towers
  *     appear - not every tower of the voltage.
@@ -48,7 +54,7 @@ function towerColour(t: TowerMarker, underground: boolean): string {
  */
 export function TowerViewportLayer({
   voltClass,
-  underground = false,
+  underground,
   fromSubstation = "",
   toSubstation = "",
   pointInRegion = null,
@@ -120,7 +126,7 @@ export function TowerViewportLayer({
         <div className="map-notice">Too many towers here - zoom in further to show them</div>
       )}
       {shown.map((t) => {
-        const colour = towerColour(t, underground);
+        const colour = towerColour(t, underground === true);
         return (
           <Circle
             key={t.tower_id}
