@@ -3,6 +3,7 @@ import { RequireAuth } from "./auth/RequireAuth";
 import LoginPage from "./pages/LoginPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MapPage from "./pages/MapPage";
+import FaultMappingPage from "./pages/FaultMappingPage";
 import SubstationListPage from "./pages/SubstationListPage";
 import SubstationDetailPage from "./pages/SubstationDetailPage";
 import SubstationEditPage from "./pages/SubstationEditPage";
@@ -27,6 +28,15 @@ export default function App() {
         element={
           <RequireAuth>
             <MapPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/fault-mapping"
+        element={
+          <RequireAuth>
+            <FaultMappingPage />
           </RequireAuth>
         }
       />

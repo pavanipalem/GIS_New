@@ -889,3 +889,116 @@ textarea {
 .leaflet-popup-content {
   margin: 0.7rem 0.85rem;
 }
+
+/* ------------------------------------------------------- fault mapping */
+.fault-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+  max-width: 1000px;
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.fault-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.fault-form select,
+.fault-form input {
+  width: 100%;
+}
+
+.fault-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fault-error {
+  max-width: 1000px;
+  padding: 0.7rem 0.9rem;
+  color: var(--danger);
+  background: #fdecea;
+  border: 1px solid #f5c6c2;
+  border-radius: 8px;
+}
+
+/* Not an error - the answer still stands, but something about it needs
+   reading before it is acted on (unverified direction, circuit-km mismatch). */
+.fault-warning {
+  max-width: 1000px;
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.86rem;
+  color: #8a4b00;
+  background: #fff3e0;
+  border: 1px solid #f0cfa0;
+  border-radius: 8px;
+}
+
+.fault-summary {
+  max-width: 1000px;
+  margin-bottom: 1rem;
+}
+
+.fault-summary h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.fault-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin: 1rem 0;
+  padding: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.fault-facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.fault-facts dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fault-facts dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fault-table {
+  margin-top: 1rem;
+}
+
+.fault-directions {
+  display: inline-block;
+  margin-top: 0.9rem;
+  font-size: 0.9rem;
+}
+
+.fault-map {
+  height: 460px;
+  width: 100%;
+  max-width: 1000px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

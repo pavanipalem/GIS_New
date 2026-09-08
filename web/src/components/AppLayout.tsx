@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: "/map", label: "Map" },
   { to: "/substations", label: "Substations" },
   { to: "/lines", label: "Lines" },
+  { to: "/fault-mapping", label: "Fault mapping" },
   { to: "/solar-plants", label: "Solar" },
   { to: "/ehv-consumers", label: "EHV" },
 ];
