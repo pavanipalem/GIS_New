@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { GisHeader } from "./GisHeader";
 
 const NAV_ITEMS = [
   { to: "/", label: "Home", end: true },
@@ -12,14 +13,13 @@ const NAV_ITEMS = [
   { to: "/ehv-consumers", label: "EHV" },
 ];
 
-/** Top bar plus content. `fullBleed` is for the map, which manages its own
- * scrolling and needs the remaining height exactly; everything else gets a
- * normal padded, scrollable page.
+/** Institutional header, then a lean section bar, then the page.
  *
- * The tabs are a single scrollable strip rather than a wrapping row: the
- * header is a fixed band above the map, so a second line of links would eat
- * map height at narrow widths. Users is admin-only and sits after a divider
- * because it administers the app rather than the network data. */
+ * `fullBleed` is for the map, which manages its own scrolling and needs the
+ * remaining height exactly; everything else gets a normal padded, scrollable
+ * page. The section bar is one compact scrollable row so it never wraps to a
+ * second line and eats map height. Users is admin-only and sits after a
+ * divider because it administers the app rather than the network data. */
 export function AppLayout({
   children,
   fullBleed = false,
@@ -31,15 +31,10 @@ export function AppLayout({
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-brand">
-          <span className="app-brand-mark" aria-hidden="true">
-            TG
-          </span>
-          <span className="app-brand-name">TGTransco GIS</span>
-        </div>
+      <GisHeader />
 
-        <nav className="app-nav" aria-label="Main">
+      <nav className="app-nav-bar" aria-label="Sections">
+        <div className="app-nav-links">
           {NAV_ITEMS.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className="app-nav-link">
               {item.label}
@@ -53,18 +48,21 @@ export function AppLayout({
               </NavLink>
             </>
           )}
-        </nav>
+        </div>
 
-        <div className="app-header-right">
+        <div className="app-nav-user">
           <span className="app-user">
             <span className="app-user-name">{user?.username}</span>
-            {user?.role && <span className={`app-role app-role-${user.role}`}>{user.role}</span>}
+            {user?.role && (
+              <span className={`app-role app-role-${user.role}`}>{user.role}</span>
+            )}
           </span>
           <button type="button" className="app-signout" onClick={logout}>
             Sign out
           </button>
         </div>
-      </header>
+      </nav>
+
       <main className={fullBleed ? "app-main-full" : "app-main"}>{children}</main>
     </div>
   );

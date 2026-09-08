@@ -366,65 +366,107 @@
   height: 100%;
 }
 
-.app-header {
+/* Institutional header - carried on every page. A light letterhead band:
+   the two brand marks flanking the corporation identity, over a thin bar of
+   the TGTRANSCO green. */
+.gis-header {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.4rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 2px solid #4d7c3f;
+}
+
+.gis-header-mark {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.gis-header-mark img {
+  height: 52px;
+  width: auto;
+  display: block;
+}
+
+.gis-header-emblem {
+  height: 50px;
+  width: auto;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.gis-header-titles {
+  text-align: center;
+  min-width: 0;
+}
+
+.gis-header-corp {
+  margin: 0;
+  font-size: clamp(0.86rem, 1.7vw, 1.1rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.gis-header-addr {
+  margin: 0.15rem 0 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.gis-header-portal {
+  display: inline-block;
+  margin: 0.3rem 0 0;
+  padding-top: 0.28rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+
+/* Lean section bar under the header: one compact, scrollable row so it never
+   wraps to a second line and eats page height. */
+.app-nav-bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  flex: 0 0 auto;
-  padding: 0.5rem 1rem;
+  gap: 1rem;
+  padding: 0.2rem 1rem;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(28, 31, 36, 0.04);
+  box-shadow: 0 1px 2px rgba(28, 31, 36, 0.05);
 }
 
-.app-brand {
+.app-nav-links {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex: 0 0 auto;
-}
-
-.app-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #fff;
-  background: var(--accent);
-  border-radius: 7px;
-}
-
-.app-brand-name {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* One scrollable strip - the header sits above the map, so wrapping to a
-   second line would take height away from it. */
-.app-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
+  gap: 0.1rem;
   flex: 1;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.app-nav::-webkit-scrollbar {
+.app-nav-links::-webkit-scrollbar {
   display: none;
 }
 
 .app-nav-link {
-  padding: 0.35rem 0.7rem;
-  font-size: 0.9rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
   text-decoration: none;
   white-space: nowrap;
-  border-radius: 7px;
+  border-radius: 6px;
   transition: background 0.12s, color 0.12s;
 }
 
@@ -446,16 +488,16 @@
 
 .app-nav-divider {
   width: 1px;
-  height: 18px;
-  margin: 0 0.4rem;
+  height: 16px;
+  margin: 0 0.35rem;
   background: var(--border);
   flex: 0 0 auto;
 }
 
-.app-header-right {
+.app-nav-user {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   flex: 0 0 auto;
 }
 
@@ -463,7 +505,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text);
 }
 
@@ -474,8 +516,8 @@
 /* The role decides what the app lets you do, so it is worth reading at a
    glance rather than hiding in a parenthesis. */
 .app-role {
-  padding: 0.1rem 0.4rem;
-  font-size: 0.7rem;
+  padding: 0.08rem 0.36rem;
+  font-size: 0.66rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -498,18 +540,32 @@
 }
 
 .app-signout {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   background: none;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 6px;
 }
 
 .app-signout:hover:not(:disabled) {
   color: var(--text);
   background: var(--bg);
   filter: none;
+}
+
+@media (max-width: 640px) {
+  .gis-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.4rem;
+  }
+  .gis-header-mark img {
+    height: 42px;
+  }
+  .gis-header-emblem {
+    height: 40px;
+  }
 }
 
 .app-main {
