@@ -20,6 +20,7 @@ import {
 import { DistrictsLayer } from "../components/map/DistrictsLayer";
 import { BaseMapLayer } from "../components/map/BaseMapLayer";
 import { useRegionTest } from "../components/map/useRegionTest";
+import { RegionBoundaryLayer } from "../components/map/RegionBoundaryLayer";
 import {
   REGION_KEYS,
   REGION_LABELS,
@@ -630,6 +631,7 @@ export default function MapPage() {
           <ClampNorth />
           <BaseMapLayer baseMap={baseMap} />
           <DistrictsLayer set={districts} />
+          <RegionBoundaryLayer regions={regions} />
 
           {VOLT_CLASSES.map((vc) => (
             <SubstationLayerGroup
