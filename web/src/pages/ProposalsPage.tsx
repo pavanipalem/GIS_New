@@ -14,7 +14,9 @@ import { AppLayout } from "../components/AppLayout";
 import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
 import { ClampNorth } from "../components/map/ClampNorth";
 import { BaseMapLayer } from "../components/map/BaseMapLayer";
+import { DistrictsLayer } from "../components/map/DistrictsLayer";
 import { IconMarkerLayer } from "../components/map/IconMarkerLayer";
+import { MapLegend } from "../components/map/MapLegend";
 import {
   ALLOWED_BOUNDS,
   MAX_ZOOM,
@@ -267,14 +269,6 @@ function ProposedSubstationTab() {
           </div>
         )}
 
-        <div className="proposals-legend">
-          <span>
-            <i style={{ background: VOLT_COLOUR["400"] }} /> overhead line
-          </span>
-          <span>
-            <i className="dash" style={{ borderColor: UG_COLOUR["132"] }} /> UG cable
-          </span>
-        </div>
       </aside>
 
       <div className="proposals-map">
@@ -290,8 +284,10 @@ function ProposedSubstationTab() {
           <InvalidateSizeOnResize />
           <ClampNorth />
           <BaseMapLayer baseMap="osm" />
+          <DistrictsLayer set="new" />
           <ClickToPlace onPlace={setPoint} />
           <FrameCircle point={point} />
+          <MapLegend />
 
           {!point && (
             <div className="proposals-map-hint">Click to place the proposed substation</div>

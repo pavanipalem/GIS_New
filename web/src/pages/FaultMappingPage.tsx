@@ -4,11 +4,19 @@ import "leaflet/dist/leaflet.css";
 import { AppLayout } from "../components/AppLayout";
 import { InvalidateSizeOnResize } from "../components/map/InvalidateSizeOnResize";
 import { FitBounds } from "../components/map/FitBounds";
+import { IconMarkerLayer } from "../components/map/IconMarkerLayer";
+import { MapLegend } from "../components/map/MapLegend";
 import { mapApi } from "../api/map";
 import { faultApi } from "../api/fault";
 import { ApiError } from "../api/client";
-import { VOLT_CLASSES, VOLT_COLOUR, type VoltClass } from "../components/map/layerConfig";
-import type { FaultLocation } from "../types/fault";
+import {
+  SUBSTATION_ICON,
+  VOLT_CLASSES,
+  VOLT_COLOUR,
+  VOLT_ICON_SIZE,
+  type VoltClass,
+} from "../components/map/layerConfig";
+import type { FaultEndSubstation, FaultLocation } from "../types/fault";
 
 /** Fault mapping: given a distance-to-fault reported from one end of a line,
  * show where on the line that lands.
@@ -295,6 +303,41 @@ export default function FaultMappingPage() {
 
             <Polyline positions={path} pathOptions={{ color: routeColour, weight: 3, opacity: 0.8 }} />
 
+            {/* the two end substations, with the Map view's voltage icons */}
+            {[result.source_substation, result.target_substation]
+              .filter((s): s is FaultEndSubstation & { lat: number; lng: number } =>
+                s.lat != null && s.lng != null
+              )
+              .map((s) => {
+                const vc = (s.volt_class ?? "") as VoltClass;
+                const icon = SUBSTATION_ICON[vc] ?? SUBSTATION_ICON["132"];
+                const size = (VOLT_ICON_SIZE[vc] ?? 12) + 6;
+                return (
+                  <IconMarkerLayer
+                    key={s.name}
+                    points={[{ lat: s.lat, lng: s.lng, name: s.name, volt_class: s.volt_class }]}
+                    iconUrl={icon}
+                    size={size}
+                    keyOf={(p) => p.name}
+                    tooltip={(p) => p.name}
+                    popup={(p) => (
+                      <>
+                        <strong>
+                          {p.volt_class ? `${p.volt_class} kV · ` : ""}
+                          {p.name}
+                        </strong>
+                        <br />
+                        {p.name === result.measured_from
+                          ? "Source substation (fault measured from here)"
+                          : "Other end of the line"}
+                      </>
+                    )}
+                  />
+                );
+              })}
+
+            {/* tower markers behave like the Map view: hover = location no +
+                type, click = the full tower / line info */}
             {result.towers.map((t) => (
               <CircleMarker
                 key={t.tower_id}
@@ -310,8 +353,37 @@ export default function FaultMappingPage() {
                 <Tooltip direction="top">
                   {t.location_no ?? t.tower_id}
                   <br />
-                  {t.distance_km.toFixed(3)} km from {result.measured_from}
+                  {t.tower_type ?? "-"}
                 </Tooltip>
+                <Popup minWidth={240}>
+                  <strong>{result.feeder_name ?? `Feeder ${result.feeder_id}`}</strong>
+                  <br />
+                  Length (ckm): {result.recorded_length_ckm ?? "-"}
+                  <br />
+                  Total locations: {result.line_total_locations ?? "-"}
+                  <br />
+                  Circuit type: {result.line_circuit_type ?? "-"}
+                  <br />
+                  Date of charging: {result.line_date_of_charging ?? "-"}
+                  <br />
+                  Location no: {t.location_no ?? "-"}
+                  <br />
+                  Latitude: {t.lat}
+                  <br />
+                  Longitude: {t.lng}
+                  <br />
+                  Type of tower: {t.tower_type ?? "-"}
+                  <br />
+                  Type of conductor: {result.line_conductor_type ?? "-"}
+                  {t.telecom_joint_box && (
+                    <>
+                      <br />
+                      Telecom: {t.telecom_joint_box}
+                    </>
+                  )}
+                  <br />
+                  <em>{t.distance_km.toFixed(3)} km from {result.measured_from}</em>
+                </Popup>
               </CircleMarker>
             ))}
 
@@ -351,6 +423,12 @@ export default function FaultMappingPage() {
                 {result.fault_point.lat.toFixed(6)}, {result.fault_point.lng.toFixed(6)}
               </Popup>
             </CircleMarker>
+
+            <MapLegend
+              extras={[
+                { swatch: "#c0392b", label: "fault span / point" },
+              ]}
+            />
           </MapContainer>
         </>
       )}

@@ -1321,3 +1321,91 @@ textarea {
   color: var(--text-muted);
   font-size: 0.95rem;
 }
+
+/* -------------------------------------------------- shared map legend */
+.map-legend,
+.map-legend-toggle {
+  position: absolute;
+  left: 12px;
+  bottom: 22px;
+  z-index: 500;
+  font-size: 0.76rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 6px rgba(28, 31, 36, 0.15);
+}
+
+.map-legend-toggle {
+  padding: 0.35rem 0.7rem;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.map-legend {
+  width: 132px;
+  padding: 0.5rem 0.6rem 0.6rem;
+  color: var(--text-muted);
+}
+
+.map-legend-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+
+.map-legend-head button {
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.map-legend-group {
+  margin: 0.5rem 0 0.2rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.map-legend-group:first-of-type {
+  margin-top: 0;
+}
+
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  line-height: 1.7;
+}
+
+.map-legend-row img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  flex: 0 0 15px;
+}
+
+.map-legend-row i {
+  display: inline-block;
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  flex: 0 0 20px;
+}
+
+.map-legend-row i.dash {
+  height: 0;
+  border-top: 3px dashed;
+}

@@ -17,6 +17,19 @@ class FaultTower(BaseModel):
     distance_km: float
 
 
+class FaultEndSubstation(BaseModel):
+    """An end of the faulted line, for placing its marker on the map.
+
+    lat/lng are null when the name could not be matched to a substation
+    record - the same case that leaves direction_verified false.
+    """
+
+    name: str
+    lat: float | None
+    lng: float | None
+    volt_class: str | None
+
+
 class FaultLocation(BaseModel):
     """Where a reported fault distance lands on a line.
 
@@ -33,6 +46,17 @@ class FaultLocation(BaseModel):
     volt_class: str | None
     from_substation: str | None
     to_substation: str | None
+
+    # line context, so the tower popup can show the same fields the Map view
+    # popup does
+    line_circuit_type: str | None
+    line_conductor_type: str | None
+    line_date_of_charging: str | None
+    line_total_locations: int | None
+
+    # the two ends, for their map markers - source is the measuring end
+    source_substation: FaultEndSubstation
+    target_substation: FaultEndSubstation
 
     measured_from: str
     reversed: bool

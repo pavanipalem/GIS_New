@@ -15,7 +15,7 @@ from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models.line import Line
-from app.schemas.fault import FaultLocation, FaultTower
+from app.schemas.fault import FaultEndSubstation, FaultLocation, FaultTower
 from app.schemas.map import MapPoint
 
 # How close the route's end has to be to a substation before we believe the
@@ -141,6 +141,59 @@ def _route_direction(db: Session, line: Line) -> tuple[str | None, str | None, b
         "assumed to run From to To as recorded. Check the result against a known "
         "location before acting on it.",
         False,
+    )
+
+
+def _end_substations(
+    db: Session, line: Line
+) -> tuple[FaultEndSubstation | None, FaultEndSubstation | None]:
+    """The from / to substation records, each the nearest by name to the
+    matching end of the route (names repeat across voltage classes)."""
+    row = db.execute(
+        text(
+            """
+            WITH r AS (
+                SELECT ST_StartPoint(route::geometry)::geography AS sp,
+                       ST_EndPoint(route::geometry)::geography   AS ep
+                FROM gis.line WHERE feeder_id = :fid
+            )
+            SELECT
+              ST_Y(f.location::geometry) AS f_lat, ST_X(f.location::geometry) AS f_lng,
+              f.volt_class AS f_vc,
+              ST_Y(t.location::geometry) AS t_lat, ST_X(t.location::geometry) AS t_lng,
+              t.volt_class AS t_vc
+            FROM r
+            LEFT JOIN LATERAL (
+              SELECT s.location, s.volt_class FROM gis.substation s, r
+              WHERE s.location IS NOT NULL AND btrim(s.ss_name) = btrim(:from_name)
+              ORDER BY ST_Distance(s.location, r.sp) LIMIT 1
+            ) f ON true
+            LEFT JOIN LATERAL (
+              SELECT s.location, s.volt_class FROM gis.substation s, r
+              WHERE s.location IS NOT NULL AND btrim(s.ss_name) = btrim(:to_name)
+              ORDER BY ST_Distance(s.location, r.ep) LIMIT 1
+            ) t ON true
+            """
+        ),
+        {
+            "fid": line.feeder_id,
+            "from_name": line.from_substation or "",
+            "to_name": line.to_substation or "",
+        },
+    ).one_or_none()
+
+    def build(name: str | None, lat, lng, vc) -> FaultEndSubstation | None:
+        if not name:
+            return None
+        return FaultEndSubstation(name=name, lat=lat, lng=lng, volt_class=vc)
+
+    if row is None:
+        return build(line.from_substation, None, None, line.volt_class), build(
+            line.to_substation, None, None, line.volt_class
+        )
+    return (
+        build(line.from_substation, row.f_lat, row.f_lng, row.f_vc or line.volt_class),
+        build(line.to_substation, row.t_lat, row.t_lng, row.t_vc or line.volt_class),
     )
 
 
@@ -272,12 +325,38 @@ def locate_fault(
     fault_lat = a["lat"] + (b["lat"] - a["lat"]) * ratio
     fault_lng = a["lng"] + (b["lng"] - a["lng"]) * ratio
 
+    from_es, to_es = _end_substations(db, line)
+    fallback = FaultEndSubstation(
+        name=measured_from, lat=None, lng=None, volt_class=line.volt_class
+    )
+    if measured_from.casefold() == stored_from.casefold():
+        source_es, target_es = from_es, to_es
+    else:
+        source_es, target_es = to_es, from_es
+    source_es = source_es or fallback
+    target_es = target_es or FaultEndSubstation(
+        name=stored_to if measured_from.casefold() == stored_from.casefold() else stored_from,
+        lat=None,
+        lng=None,
+        volt_class=line.volt_class,
+    )
+
+    charged = line.date_of_charging_raw or (
+        line.date_of_charging.isoformat() if line.date_of_charging else None
+    )
+
     return FaultLocation(
         feeder_id=line.feeder_id,
         feeder_name=line.feeder_name,
         volt_class=line.volt_class,
         from_substation=line.from_substation,
         to_substation=line.to_substation,
+        line_circuit_type=line.circuit_type,
+        line_conductor_type=line.conductor_type,
+        line_date_of_charging=charged,
+        line_total_locations=line.total_no_of_locations or line.tower_count,
+        source_substation=source_es,
+        target_substation=target_es,
         measured_from=measured_from,
         reversed=is_reversed,
         direction_verified=verified,
