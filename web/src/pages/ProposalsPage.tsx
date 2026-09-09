@@ -18,6 +18,10 @@ import { DistrictsLayer } from "../components/map/DistrictsLayer";
 import { IconMarkerLayer } from "../components/map/IconMarkerLayer";
 import { MapLegend } from "../components/map/MapLegend";
 import {
+  TowerViewportLayer,
+  TOWER_ZOOM_THRESHOLD,
+} from "../components/map/TowerViewportLayer";
+import {
   ALLOWED_BOUNDS,
   MAX_ZOOM,
   MIN_ZOOM,
@@ -38,6 +42,20 @@ import type { MapPoint } from "../types/map";
 const TELANGANA_CENTER: [number, number] = [17.9, 79.3];
 const RADIUS_KM = 20;
 const CIRCLE_COLOUR = "#1f77b4";
+
+/** Great-circle km between two lat/lng points - to keep towers inside the
+ * circle without a round trip. */
+function kmBetween(a: Point, bLat: number, bLng: number): number {
+  const R = 6371;
+  const dLat = ((bLat - a.lat) * Math.PI) / 180;
+  const dLng = ((bLng - a.lng) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((bLat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
 
 type TabKey = "ss" | "line";
 type Point = { lat: number; lng: number };
@@ -173,6 +191,7 @@ function ProposedSubstationTab() {
         <p className="proposals-hint">
           Click the map to drop the proposed point, or search a place. Everything
           within {RADIUS_KM} km is shown; line routes are clipped to the circle.
+          Zoom in past level {TOWER_ZOOM_THRESHOLD} for tower locations.
         </p>
 
         <label className="proposals-field">
@@ -316,6 +335,19 @@ function ProposedSubstationTab() {
                   },
                 }}
               />
+
+              {/* towers on the nearby lines, kept inside the circle - hover
+                  and click behave exactly as on the Map view (same layer). At
+                  zoom {TOWER_ZOOM_THRESHOLD}+ only, as on the Map view. */}
+              {VOLT_CLASSES.filter((vc) => volts.has(vc)).map((vc) => (
+                <TowerViewportLayer
+                  key={`tw-${vc}`}
+                  voltClass={vc}
+                  pointInRegion={(lat, lng) =>
+                    kmBetween(point, lat, lng) <= RADIUS_KM
+                  }
+                />
+              ))}
             </>
           )}
 
