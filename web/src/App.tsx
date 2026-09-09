@@ -4,6 +4,7 @@ import LoginPage from "./pages/LoginPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import MapPage from "./pages/MapPage";
 import FaultMappingPage from "./pages/FaultMappingPage";
+import ProposalsPage from "./pages/ProposalsPage";
 import SubstationListPage from "./pages/SubstationListPage";
 import SubstationDetailPage from "./pages/SubstationDetailPage";
 import SubstationEditPage from "./pages/SubstationEditPage";
@@ -37,6 +38,15 @@ export default function App() {
         element={
           <RequireAuth>
             <FaultMappingPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/proposals"
+        element={
+          <RequireAuth>
+            <ProposalsPage />
           </RequireAuth>
         }
       />
